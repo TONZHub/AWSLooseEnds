@@ -104,6 +104,8 @@ class AlexaAdapterTests(unittest.TestCase):
             result = lambda_function._invoke(event(), {"operation": "review"})
         call = client.invoke_agent_runtime.call_args.kwargs
         self.assertTrue(call["runtimeUserId"].startswith("alexa-"))
+        payload = json.loads(call["payload"])
+        self.assertEqual(call["runtimeUserId"], payload["actor_id"])
         self.assertGreaterEqual(len(call["runtimeSessionId"]), 33)
         self.assertEqual(["one"], result["captured_commitment_ids"])
 

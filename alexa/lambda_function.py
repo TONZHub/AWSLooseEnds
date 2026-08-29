@@ -80,14 +80,16 @@ def _read_runtime_response(response: dict[str, Any]) -> dict[str, Any]:
 def _invoke(event: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     if not AGENT_RUNTIME_ARN:
         raise RuntimeError("AGENT_RUNTIME_ARN is not configured")
+    actor_id = _actor_id(event)
+    trusted_payload = {**payload, "actor_id": actor_id}
     response = _agentcore_client().invoke_agent_runtime(
         agentRuntimeArn=AGENT_RUNTIME_ARN,
         qualifier="DEFAULT",
         runtimeSessionId=_session_id(event),
-        runtimeUserId=_actor_id(event),
+        runtimeUserId=actor_id,
         contentType="application/json",
         accept="application/json",
-        payload=json.dumps(payload).encode("utf-8"),
+        payload=json.dumps(trusted_payload).encode("utf-8"),
     )
     if response.get("statusCode") != 200:
         raise RuntimeError(f"AgentCore returned {response.get('statusCode')}")
