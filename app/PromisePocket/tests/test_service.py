@@ -93,7 +93,7 @@ class CommitmentServiceTests(unittest.TestCase):
         updated = self.service.clarify_time(
             actor_id="zoe",
             commitment_id=captured.commitment_id,
-            answer="at 10 A.M.",
+            answer="10:00",
             due_at=resolved,
         )
 
