@@ -23,7 +23,7 @@ sys.modules.setdefault("boto3", fake_boto3)
 from alexa import lambda_function
 
 
-def event(intent_name=None, commitment=None):
+def event(intent_name=None, commitment=None, *, new_session=True):
     request = {"type": "LaunchRequest", "requestId": "request-123"}
     if intent_name:
         slots = {}
@@ -37,6 +37,7 @@ def event(intent_name=None, commitment=None):
     return {
         "version": "1.0",
         "session": {
+            "new": new_session,
             "sessionId": "session-123",
             "application": {"applicationId": "amzn1.ask.skill.test-skill"},
             "user": {"userId": "amzn1.ask.account.private-user"},
@@ -77,7 +78,31 @@ class AlexaAdapterTests(unittest.TestCase):
             )
         self.assertEqual("capture", invoke.call_args.args[1]["operation"])
         self.assertEqual("call Mom tomorrow", invoke.call_args.args[1]["prompt"])
+        self.assertTrue(
+            response["response"]["outputSpeech"]["text"].startswith(
+                "Promise Pocket here."
+            )
+        )
         self.assertIn("tucked", response["response"]["outputSpeech"]["text"])
+
+    def test_follow_up_turn_does_not_repeat_brand_prefix(self):
+        with patch.object(
+            lambda_function,
+            "_invoke",
+            return_value={"captured_commitment_ids": ["commitment-1"]},
+        ):
+            response = lambda_function.lambda_handler(
+                event(
+                    "CaptureCommitmentIntent",
+                    "call Mom tomorrow",
+                    new_session=False,
+                ),
+                None,
+            )
+        self.assertEqual(
+            "Got it. I tucked that loose end away.",
+            response["response"]["outputSpeech"]["text"],
+        )
 
     def test_capture_with_missing_time_keeps_session_open(self):
         with patch.object(
@@ -102,7 +127,7 @@ class AlexaAdapterTests(unittest.TestCase):
         )
 
     def test_clarification_updates_pending_commitment(self):
-        request = event("ClarifyCommitmentIntent")
+        request = event("ClarifyCommitmentIntent", new_session=False)
         request["session"]["attributes"] = {
             "pendingCommitmentId": "commitment-1"
         }
@@ -128,7 +153,7 @@ class AlexaAdapterTests(unittest.TestCase):
                 event("ReviewPromisePocketIntent"), None
             )
         self.assertEqual(
-            "Nothing needs you right now.",
+            "Promise Pocket here. Nothing needs you right now.",
             response["response"]["outputSpeech"]["text"],
         )
 
