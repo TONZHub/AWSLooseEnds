@@ -1,1 +1,0 @@
-"""Alexa adapter package."""

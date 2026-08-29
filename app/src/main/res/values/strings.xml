@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Promise Pocket</string>
+    <string name="tagline">A quiet place for the things you mean to do</string>
+    <string name="capture_hint">“I promised Mom I’d call the dentist tomorrow at noon”</string>
+    <string name="needs_attention_title">Needs Your Attention</string>
+    <string name="active_ledger_title">Active Ledger</string>
+    <string name="clarify_time_title">Clarify Clock Time</string>
+    <string name="btn_capture">Keep Promise</string>
+    <string name="btn_clarify">Save Time</string>
+    <string name="btn_resolve">Mark Completed</string>
+    <string name="btn_cancel">Cancel Promise</string>
+    <string name="filter_all">All</string>
+    <string name="filter_due">Due</string>
+    <string name="filter_clarifications">Clarifications</string>
+    <string name="filter_completed">Completed</string>
+</resources>
