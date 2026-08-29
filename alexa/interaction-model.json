@@ -16,6 +16,17 @@
           ]
         },
         {
+          "name": "ClarifyCommitmentIntent",
+          "slots": [
+            {"name": "answer", "type": "AMAZON.SearchQuery"}
+          ],
+          "samples": [
+            "the time is {answer}",
+            "make it {answer}",
+            "use {answer}"
+          ]
+        },
+        {
           "name": "ReviewLooseEndsIntent",
           "slots": [],
           "samples": [
