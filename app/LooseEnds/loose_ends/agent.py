@@ -36,6 +36,14 @@ Rules:
 - If there is no commitment, do not call the tool. Say so briefly.
 """.strip()
 
+CLARIFICATION_PROMPT = """
+You update the timing of one existing Loose Ends commitment.
+Use the original commitment, current UTC time, user timezone, and the user's
+follow-up answer to call clarify_commitment exactly once.
+Never change the commitment's meaning and never invent a clock time. The
+follow-up answer itself must contain the time used in due_at.
+""".strip()
+
 
 def _parse_optional_datetime(value: str | None) -> datetime | None:
     if value is None:
@@ -107,5 +115,42 @@ def build_agent(
         model=model_id,
         tools=[make_capture_tool(service, on_capture=on_capture)],
         system_prompt=SYSTEM_PROMPT,
+        callback_handler=None,
+    )
+
+
+def build_clarification_agent(
+    service: CommitmentService,
+    model_id: str,
+    actor_id: str,
+    commitment_id: str,
+    on_update: Callable[[str], None] | None = None,
+) -> Agent:
+    @tool
+    def clarify_commitment(due_at: str, answer: str) -> dict[str, Any]:
+        """Update the existing commitment with the user's explicit time answer.
+
+        Args:
+            due_at: Resolved absolute ISO-8601 datetime with UTC offset.
+            answer: Exact follow-up wording containing the clock time.
+        """
+
+        parsed_due_at = _parse_optional_datetime(due_at)
+        if parsed_due_at is None:
+            raise ValueError("due_at is required for time clarification")
+        updated = service.clarify_time(
+            actor_id=actor_id,
+            commitment_id=commitment_id,
+            answer=answer,
+            due_at=parsed_due_at,
+        )
+        if on_update is not None:
+            on_update(updated.commitment_id)
+        return updated.model_dump(mode="json")
+
+    return Agent(
+        model=model_id,
+        tools=[clarify_commitment],
+        system_prompt=CLARIFICATION_PROMPT,
         callback_handler=None,
     )
