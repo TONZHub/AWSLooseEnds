@@ -12,6 +12,10 @@ Parameters:
   UserTimezone:
     Type: String
     Default: America/New_York
+  LoginWithAmazonClientId:
+    Type: String
+    Default: ""
+    NoEcho: true
 
 Resources:
   AlexaAdapter:
@@ -30,6 +34,7 @@ Resources:
           AGENT_RUNTIME_ARN: !Ref AgentRuntimeArn
           ALEXA_SKILL_ID: !Ref AlexaSkillId
           LOOSE_ENDS_TIMEZONE: !Ref UserTimezone
+          LWA_CLIENT_ID: !Ref LoginWithAmazonClientId
       Policies:
         - Statement:
             - Sid: InvokeLooseEndsRuntime

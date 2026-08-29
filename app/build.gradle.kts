@@ -45,7 +45,7 @@ android {
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
         jvmTarget = "17"
@@ -64,6 +64,11 @@ secrets {
 }
 
 dependencies {
+    // Amazon distributes Login with Amazon as a signed local SDK rather than a
+    // Maven artifact. The vendored jar is version 3.1.6 from Amazon's official
+    // Android SDK bundle; see THIRD_PARTY_NOTICES.md.
+    implementation(files("libs/login-with-amazon-sdk.jar"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
