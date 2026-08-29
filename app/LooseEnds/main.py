@@ -8,7 +8,7 @@ from typing import Any
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
-from loose_ends.agent import build_agent
+from loose_ends.agent import build_agent, build_clarification_agent
 from loose_ends.service import CommitmentService
 from loose_ends.settings import Settings
 from loose_ends.storage import build_store
@@ -67,8 +67,40 @@ def invoke(payload: dict[str, Any], context: Any | None = None) -> dict[str, Any
             "items": [item.model_dump(mode="json") for item in items],
         }
 
+    if operation == "clarify":
+        commitment_id = payload.get("commitment_id")
+        answer = payload.get("answer")
+        if not isinstance(commitment_id, str) or not commitment_id:
+            raise ValueError("commitment_id is required for clarification")
+        if not isinstance(answer, str) or not answer.strip():
+            raise ValueError("answer is required for clarification")
+        existing = service.get(actor_id=actor_id, commitment_id=commitment_id)
+        if existing is None:
+            raise ValueError("commitment was not found for this actor")
+        timezone_name = payload.get("timezone") or settings.timezone_name
+        invocation_time = datetime.now(timezone.utc).isoformat()
+        updated_ids: list[str] = []
+        agent = build_clarification_agent(
+            service,
+            settings.model_id,
+            actor_id,
+            commitment_id,
+            on_update=updated_ids.append,
+        )
+        result = agent(
+            f"Invocation time in UTC: {invocation_time}\n"
+            f"User timezone: {timezone_name}\n"
+            f"Original commitment: {existing.raw_text}\n"
+            f"Follow-up answer: {answer.strip()}"
+        )
+        return {
+            "operation": "clarify",
+            "result": result.message,
+            "updated_commitment_ids": updated_ids,
+        }
+
     if operation != "capture":
-        raise ValueError("operation must be either 'capture' or 'review'")
+        raise ValueError("operation must be capture, clarify, or review")
 
     prompt = payload.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
@@ -105,6 +137,12 @@ def invoke(payload: dict[str, Any], context: Any | None = None) -> dict[str, Any
         "operation": "capture",
         "result": result.message,
         "captured_commitment_ids": captured_commitment_ids,
+        "captured_commitments": [
+            service.get(actor_id=actor_id, commitment_id=commitment_id).model_dump(
+                mode="json"
+            )
+            for commitment_id in captured_commitment_ids
+        ],
     }
 
 

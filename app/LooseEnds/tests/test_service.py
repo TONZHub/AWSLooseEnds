@@ -83,6 +83,25 @@ class CommitmentServiceTests(unittest.TestCase):
             captured.missing_information,
         )
 
+    def test_time_clarification_updates_same_record(self):
+        captured = self.capture(
+            raw_text="I need to call the pharmacy tomorrow",
+            due_at=NOW + timedelta(hours=15),
+        )
+        resolved = NOW + timedelta(days=1, hours=2)
+
+        updated = self.service.clarify_time(
+            actor_id="zoe",
+            commitment_id=captured.commitment_id,
+            answer="at 10 A.M.",
+            due_at=resolved,
+        )
+
+        self.assertEqual(captured.commitment_id, updated.commitment_id)
+        self.assertEqual(resolved, updated.due_at)
+        self.assertEqual([], updated.missing_information)
+        self.assertEqual(1, len(self.store.list_for_actor("zoe")))
+
     def test_actor_records_are_isolated(self):
         self.capture(actor_id="zoe", due_at=NOW - timedelta(minutes=1))
         self.capture(actor_id="someone-else", due_at=NOW - timedelta(minutes=1))

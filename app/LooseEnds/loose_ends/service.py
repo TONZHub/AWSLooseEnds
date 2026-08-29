@@ -37,6 +37,9 @@ class CommitmentService:
         self._store = store
         self._clock = clock
 
+    def get(self, *, actor_id: str, commitment_id: str) -> Commitment | None:
+        return self._store.get(actor_id, commitment_id)
+
     def capture(
         self,
         *,
@@ -67,6 +70,34 @@ class CommitmentService:
         )
         self._store.save(commitment)
         return commitment
+
+    def clarify_time(
+        self,
+        *,
+        actor_id: str,
+        commitment_id: str,
+        answer: str,
+        due_at: datetime,
+    ) -> Commitment:
+        commitment = self._store.get(actor_id, commitment_id)
+        if commitment is None:
+            raise ValueError("commitment was not found for this actor")
+        if not _has_explicit_clock_time(answer):
+            raise ValueError("the clarification must contain an explicit clock time")
+        remaining = [
+            question
+            for question in commitment.missing_information
+            if "time" not in question.casefold()
+        ]
+        updated = commitment.model_copy(
+            update={
+                "due_at": due_at,
+                "missing_information": remaining,
+                "updated_at": self._clock(),
+            }
+        )
+        self._store.save(updated)
+        return updated
 
     def review(self, *, actor_id: str, now: datetime | None = None) -> list[AttentionItem]:
         review_time = now or self._clock()
