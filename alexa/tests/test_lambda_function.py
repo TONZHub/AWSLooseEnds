@@ -140,7 +140,7 @@ class AlexaAdapterTests(unittest.TestCase):
             "pendingCommitmentId": "commitment-1"
         }
         request["request"]["intent"]["slots"] = {
-            "answer": {"name": "answer", "value": "at 10 A.M."}
+            "answer": {"name": "answer", "value": "10:00"}
         }
         with patch.object(
             lambda_function,
