@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import os
 
 
-DEFAULT_MODEL_ID = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+DEFAULT_MODEL_ID = "us.amazon.nova-lite-v1:0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,4 +32,3 @@ class Settings:
             timezone_name=os.getenv("LOOSE_ENDS_TIMEZONE", "UTC"),
             model_id=os.getenv("MODEL_ID", DEFAULT_MODEL_ID),
         )
-
