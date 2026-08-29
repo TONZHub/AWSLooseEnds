@@ -155,6 +155,36 @@ class AlexaAdapterTests(unittest.TestCase):
         self.assertEqual("clarify", invoke.call_args.args[1]["operation"])
         self.assertIn("added the time", response["response"]["outputSpeech"]["text"])
 
+    def test_clarification_missing_time_slot_preserves_pending_commitment(self):
+        request = event("ClarifyCommitmentIntent", new_session=False)
+        request["session"]["attributes"] = {
+            "pendingCommitmentId": "commitment-1"
+        }
+        with patch.object(lambda_function, "_invoke") as invoke:
+            response = lambda_function.lambda_handler(request, None)
+        invoke.assert_not_called()
+        self.assertFalse(response["response"]["shouldEndSession"])
+        self.assertEqual(
+            "commitment-1", response["sessionAttributes"]["pendingCommitmentId"]
+        )
+        self.assertIn("What time", response["response"]["outputSpeech"]["text"])
+
+    def test_unsuccessful_clarification_preserves_pending_commitment(self):
+        request = event("ClarifyCommitmentIntent", new_session=False)
+        request["session"]["attributes"] = {
+            "pendingCommitmentId": "commitment-1"
+        }
+        request["request"]["intent"]["slots"] = {
+            "answer": {"name": "answer", "value": "09:00"}
+        }
+        with patch.object(lambda_function, "_invoke", return_value={}):
+            response = lambda_function.lambda_handler(request, None)
+        self.assertFalse(response["response"]["shouldEndSession"])
+        self.assertEqual(
+            "commitment-1", response["sessionAttributes"]["pendingCommitmentId"]
+        )
+        self.assertIn("specific time", response["response"]["outputSpeech"]["text"])
+
     def test_review_stays_quiet_when_nothing_needs_attention(self):
         with patch.object(
             lambda_function,
