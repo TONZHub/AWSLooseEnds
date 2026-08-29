@@ -28,7 +28,13 @@ def _agentcore_client():
     return _agentcore
 
 
-def _speech(text: str, *, end_session: bool = True, reprompt: str | None = None):
+def _speech(
+    text: str,
+    *,
+    end_session: bool = True,
+    reprompt: str | None = None,
+    session_attributes: dict[str, Any] | None = None,
+):
     response: dict[str, Any] = {
         "outputSpeech": {"type": "PlainText", "text": text},
         "shouldEndSession": end_session,
@@ -37,7 +43,10 @@ def _speech(text: str, *, end_session: bool = True, reprompt: str | None = None)
         response["reprompt"] = {
             "outputSpeech": {"type": "PlainText", "text": reprompt}
         }
-    return {"version": "1.0", "response": response}
+    payload = {"version": "1.0", "response": response}
+    if session_attributes:
+        payload["sessionAttributes"] = session_attributes
+    return payload
 
 
 def _verify_skill(event: dict[str, Any]) -> None:
@@ -114,6 +123,17 @@ def _capture(event: dict[str, Any], intent: dict[str, Any]):
         {"operation": "capture", "prompt": commitment, "timezone": DEFAULT_TIMEZONE},
     )
     if result.get("captured_commitment_ids"):
+        captured = result.get("captured_commitments") or []
+        if captured and captured[0].get("missing_information"):
+            question = captured[0]["missing_information"][0]
+            return _speech(
+                question,
+                end_session=False,
+                reprompt=question,
+                session_attributes={
+                    "pendingCommitmentId": captured[0]["commitment_id"]
+                },
+            )
         return _speech("Got it. I tucked that loose end away.")
     return _speech(
         "I didn't hear a definite commitment there. What should I keep track of?",
@@ -132,6 +152,27 @@ def _review(event: dict[str, Any]):
     if len(items) > 3:
         prompts.append(f"And {len(items) - 3} more.")
     return _speech(" ".join(prompts))
+
+
+def _clarify(event: dict[str, Any], intent: dict[str, Any]):
+    commitment_id = event.get("session", {}).get("attributes", {}).get(
+        "pendingCommitmentId"
+    )
+    answer = _slot_value(intent, "answer")
+    if not commitment_id or not answer:
+        return _speech("What time should I use?", end_session=False)
+    result = _invoke(
+        event,
+        {
+            "operation": "clarify",
+            "commitment_id": commitment_id,
+            "answer": answer,
+            "timezone": DEFAULT_TIMEZONE,
+        },
+    )
+    if result.get("updated_commitment_ids"):
+        return _speech("Perfect. I added the time to that loose end.")
+    return _speech("I still need a specific time.", end_session=False)
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -157,6 +198,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return _capture(event, intent)
         if name == "ReviewLooseEndsIntent":
             return _review(event)
+        if name == "ClarifyCommitmentIntent":
+            return _clarify(event, intent)
         if name == "AMAZON.HelpIntent":
             return _speech(
                 "Say, remember that I need to call Mom tomorrow.",
