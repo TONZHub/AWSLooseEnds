@@ -26,9 +26,11 @@
         {
           "name": "ClarifyCommitmentIntent",
           "slots": [
-            {"name": "answer", "type": "AMAZON.SearchQuery"}
+            {"name": "answer", "type": "AMAZON.TIME"}
           ],
           "samples": [
+            "{answer}",
+            "at {answer}",
             "the time is {answer}",
             "make it {answer}",
             "use {answer}"
