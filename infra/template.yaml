@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Exact commitment ledger and least-privilege runtime policy for Loose Ends.
+
+Parameters:
+  TableName:
+    Type: String
+    Default: loose-ends-commitments
+    AllowedPattern: "[A-Za-z0-9_.-]+"
+
+Resources:
+  CommitmentsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: actor_id
+          AttributeType: S
+        - AttributeName: commitment_id
+          AttributeType: S
+        - AttributeName: actor_status
+          AttributeType: S
+        - AttributeName: next_review_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: actor_id
+          KeyType: HASH
+        - AttributeName: commitment_id
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: status-review-index
+          KeySchema:
+            - AttributeName: actor_status
+              KeyType: HASH
+            - AttributeName: next_review_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Project
+          Value: LooseEnds
+
+  CommitmentsRuntimePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: loose-ends-commitments-runtime
+      Description: Read and write only the Loose Ends commitment ledger.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CommitmentLedger
+            Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:Query
+              - dynamodb:UpdateItem
+            Resource:
+              - !GetAtt CommitmentsTable.Arn
+              - !Sub "${CommitmentsTable.Arn}/index/*"
+
+Outputs:
+  CommitmentsTableName:
+    Description: Set this as LOOSE_ENDS_TABLE on the AgentCore runtime.
+    Value: !Ref CommitmentsTable
+  CommitmentsTableArn:
+    Value: !GetAtt CommitmentsTable.Arn
+  CommitmentsPolicyArn:
+    Description: Add this ARN to the runtime additionalPolicies list.
+    Value: !Ref CommitmentsRuntimePolicy
+
