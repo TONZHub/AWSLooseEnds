@@ -3,6 +3,7 @@ package com.example.promisepocket.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.promisepocket.auth.AmazonAuthResult
 import com.example.promisepocket.data.local.AppDatabase
 import com.example.promisepocket.data.model.AttentionItem
 import com.example.promisepocket.data.model.CommitmentEntity
@@ -30,7 +31,10 @@ enum class FilterTab {
 
 data class PromisePocketUiState(
     val currentActor: String = "local-user",
-    val availableActors: List<String> = listOf("local-user", "zoe", "work-profile"),
+    val isAmazonSignedIn: Boolean = false,
+    val isAmazonAuthLoading: Boolean = false,
+    val amazonAccountName: String? = null,
+    val amazonAccountEmail: String? = null,
     val filterTab: FilterTab = FilterTab.ALL,
     val searchQuery: String = "",
     val isCapturing: Boolean = false,
@@ -105,7 +109,6 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
             val clarifyItem = _activeClarificationItem.value
             val detailItem = _activeDetailCommitment.value
             val notification = _userNotification.value
-
             val commitments = repository.listForActor(actor)
             val attention = service.review(actor, commitments)
 
@@ -129,8 +132,13 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
                 matchesQuery && matchesTab
             }
 
+            val authState = _uiState.value
             _uiState.value = PromisePocketUiState(
                 currentActor = actor,
+                isAmazonSignedIn = authState.isAmazonSignedIn,
+                isAmazonAuthLoading = authState.isAmazonAuthLoading,
+                amazonAccountName = authState.amazonAccountName,
+                amazonAccountEmail = authState.amazonAccountEmail,
                 filterTab = tab,
                 searchQuery = query,
                 isCapturing = capturing,
@@ -145,9 +153,42 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    fun setActor(actor: String) {
-        _currentActor.value = actor
-        refreshData()
+    fun onAmazonAuthResult(result: AmazonAuthResult) {
+        when (result) {
+            AmazonAuthResult.Loading -> {
+                _uiState.value = _uiState.value.copy(isAmazonAuthLoading = true)
+            }
+            AmazonAuthResult.Cancelled -> {
+                _userNotification.value = "Amazon sign-in canceled."
+                _uiState.value = _uiState.value.copy(isAmazonAuthLoading = false)
+                refreshData()
+            }
+            AmazonAuthResult.SignedOut -> {
+                _currentActor.value = "local-user"
+                _uiState.value = _uiState.value.copy(
+                    isAmazonSignedIn = false,
+                    isAmazonAuthLoading = false,
+                    amazonAccountName = null,
+                    amazonAccountEmail = null
+                )
+                refreshData()
+            }
+            is AmazonAuthResult.SignedIn -> {
+                _currentActor.value = result.account.actorId
+                _uiState.value = _uiState.value.copy(
+                    isAmazonSignedIn = true,
+                    isAmazonAuthLoading = false,
+                    amazonAccountName = result.account.name,
+                    amazonAccountEmail = result.account.email
+                )
+                refreshData()
+            }
+            is AmazonAuthResult.Error -> {
+                _userNotification.value = result.message
+                _uiState.value = _uiState.value.copy(isAmazonAuthLoading = false)
+                refreshData()
+            }
+        }
     }
 
     fun setFilterTab(tab: FilterTab) {

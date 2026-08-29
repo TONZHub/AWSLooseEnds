@@ -1,8 +1,13 @@
 # Gradle and Build Files
 .gradle/
+.kotlin/
 build/
 app/build/
 .build-outputs/
+
+# Python caches
+__pycache__/
+*.py[cod]
 
 # Android Studio / IntelliJ / VS Code
 .idea/
@@ -13,6 +18,7 @@ app/build/
 # Secrets & Environment Variables
 .env
 local.properties
+app/src/main/assets/api_key.txt
 
 # Android Build Outputs & Keystores
 *.apk
