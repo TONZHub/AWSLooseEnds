@@ -15,6 +15,8 @@
             "I have to {commitment}",
             "I should {commitment}",
             "I promised to {commitment}",
+            "hold me to {commitment}",
+            "could you hold me to {commitment}",
             "don't let me forget to {commitment}",
             "save {commitment}",
             "write down {commitment}",
