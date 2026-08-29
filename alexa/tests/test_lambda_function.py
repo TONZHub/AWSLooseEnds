@@ -79,6 +79,45 @@ class AlexaAdapterTests(unittest.TestCase):
         self.assertEqual("call Mom tomorrow", invoke.call_args.args[1]["prompt"])
         self.assertIn("tucked", response["response"]["outputSpeech"]["text"])
 
+    def test_capture_with_missing_time_keeps_session_open(self):
+        with patch.object(
+            lambda_function,
+            "_invoke",
+            return_value={
+                "captured_commitment_ids": ["commitment-1"],
+                "captured_commitments": [
+                    {
+                        "commitment_id": "commitment-1",
+                        "missing_information": ["What time should I bring this back?"],
+                    }
+                ],
+            },
+        ):
+            response = lambda_function.lambda_handler(
+                event("CaptureCommitmentIntent", "call the vet tomorrow"), None
+            )
+        self.assertFalse(response["response"]["shouldEndSession"])
+        self.assertEqual(
+            "commitment-1", response["sessionAttributes"]["pendingCommitmentId"]
+        )
+
+    def test_clarification_updates_pending_commitment(self):
+        request = event("ClarifyCommitmentIntent")
+        request["session"]["attributes"] = {
+            "pendingCommitmentId": "commitment-1"
+        }
+        request["request"]["intent"]["slots"] = {
+            "answer": {"name": "answer", "value": "at 10 A.M."}
+        }
+        with patch.object(
+            lambda_function,
+            "_invoke",
+            return_value={"updated_commitment_ids": ["commitment-1"]},
+        ) as invoke:
+            response = lambda_function.lambda_handler(request, None)
+        self.assertEqual("clarify", invoke.call_args.args[1]["operation"])
+        self.assertIn("added the time", response["response"]["outputSpeech"]["text"])
+
     def test_review_stays_quiet_when_nothing_needs_attention(self):
         with patch.object(
             lambda_function,
