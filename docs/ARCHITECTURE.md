@@ -1,6 +1,6 @@
-# Architecture
+# Promise Pocket architecture
 
-Loose Ends separates language interpretation from commitment truth and from interruption policy.
+Promise Pocket separates language interpretation from commitment truth and from interruption policy.
 
 ## Components
 
