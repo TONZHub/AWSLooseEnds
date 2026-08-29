@@ -1,150 +1,58 @@
-# Promise Pocket
+# Promise Pocket (Android)
 
 **A quiet place for the things you mean to do.**
 
-Promise Pocket captures commitments in ordinary language, keeps an exact ledger of them, and interrupts only when a person genuinely needs to act, clarify, decide, approve, send, or pay.
+Promise Pocket captures commitments in ordinary language, keeps an exact local ledger of them in Room, and interrupts only when a person genuinely needs to act, clarify, decide, approve, send, or pay.
 
-> “I promised Mom I’d call the dentist tomorrow.”
+> “I promised Mom I’d call the dentist tomorrow at noon.”
 
-That becomes a structured loose end, waits without nagging, and returns when the dentist call actually needs the user.
+That becomes a structured loose end, waits without nagging, and surfaces with zero noise when it actually needs you.
 
-## The first vertical slice
+---
 
-1. A user states a real commitment.
-2. A Strands agent converts it into validated fields and calls one tool: `capture_commitment`.
-3. The commitment is stored locally during development or in DynamoDB when deployed.
-4. A deterministic reviewer returns only commitments that need human attention.
+## Features
 
-The language model interprets the sentence. It does **not** decide whether a stored record is due, completed, or safe to ignore.
+- **Natural Promise Capture**: Speak or type ordinary commitments (e.g. *"I promised Mom I'd call the dentist tomorrow at noon"*).
+- **Fail-Closed Timing Clarification**: If a date is mentioned without an explicit clock time, the deterministic policy flags it for precise clarification rather than hallucinating a deadline.
+- **Deterministic Review Policy**: Pure, zero-model deterministic evaluation of active commitments against the clock, categorizing items by:
+  - **Needs Clarification**: Commitments with missing details or unanchored timing.
+  - **Due Now**: Actionable items whose exact deadline has arrived.
+  - **Blocked**: Promises blocked by an external reason.
+- **Autonomous Safe Work vs Human Action**: Distinguishes between work that requires direct human intervention (calling, paying, deciding) versus quiet background agent preparation.
+- **Offline-First Room Database**: Structured persistence with `CommitmentEntity` and multi-actor isolation (`local-user`, `zoe`, `work-profile`).
+- **Gemini API Integration**: Uses `gemini-3.5-flash` with structured JSON output for parsing when configured, backed by an intelligent local heuristic parser.
+- **Polished Material 3 UI**: Soft Sand & Slate palette, responsive status chips, quick capture bar, and custom adaptive app launcher icons.
 
-```mermaid
-flowchart TD
-    A["Ordinary-language promise"] --> B["Strands on AgentCore"]
-    B --> C["Validated commitment"]
-    C --> D["DynamoDB ledger"]
-    D --> E["Deterministic review"]
-    E -->|"Only when needed"| F["Human attention"]
-```
+---
 
-## Current boundaries
-
-- Promise Pocket may remember, organize, research, or prepare without interrupting.
-- It must ask before external side effects such as sending, buying, booking, approving, or making a consequential decision.
-- It never invents a deadline. Missing timing becomes a clarification, not a confident guess.
-- DynamoDB is the source of truth for commitments. AgentCore Memory may later hold conversational context, but semantic memory is not an obligation ledger.
-- Alexa is a thin voice adapter; commitment logic stays in AgentCore.
-
-## Repository layout
+## Repository Structure
 
 ```text
-agentcore/                 AgentCore Runtime project configuration
-app/PromisePocket/         Python agent, domain logic, stores, and tests
-docs/                      Architecture and build sequence
-infra/template.yaml        DynamoDB table and least-privilege access policy
+app/
+  src/main/
+    java/com/example/promisepocket/
+      data/
+        local/        Room Database, DAO, Converters
+        model/        CommitmentEntity, AttentionItem, Status enums
+        remote/       Gemini REST API & DTO models
+        repository/   CommitmentRepository
+      domain/         CommitmentService (Review & Capture logic), PromiseParser, TimeUtils
+      ui/
+        components/   AttentionBanner, CommitmentCard, ClarificationDialog, QuickCaptureBar
+        screens/      MainScreen
+        theme/        Color, Typography, Theme
+        viewmodel/    PromisePocketViewModel
+      MainActivity.kt
+    res/              Vector drawables, Adaptive Icons, Strings
+  src/test/           JUnit domain & policy unit tests
 ```
 
-## Run the domain tests
+---
 
-The tests exercise capture, persistence, and the human-attention policy without calling a model or AWS.
+## Running the Unit Tests
+
+Execute unit tests directly with Gradle:
 
 ```bash
-cd app/PromisePocket
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
-python -m unittest discover -s tests -v
+gradle :app:testDebugUnitTest
 ```
-
-On Windows PowerShell, activate with `.venv\Scripts\Activate.ps1`.
-
-## Run the agent locally
-
-Prerequisites: Python 3.12+, Node.js 20+, configured AWS credentials, and access to the selected Amazon Bedrock model.
-
-```bash
-npm install -g @aws/agentcore
-cp agentcore/aws-targets.example.json agentcore/aws-targets.json
-cp .env.example agentcore/.env.local
-```
-
-Replace the placeholder AWS account in `agentcore/aws-targets.json`, then start the local inspector:
-
-```bash
-agentcore dev
-```
-
-Capture the demo commitment from a second terminal:
-
-```bash
-agentcore dev "I promised Mom I would call the dentist tomorrow"
-```
-
-Review what needs human attention:
-
-```bash
-curl -sS http://localhost:8080/invocations \
-  -H "Content-Type: application/json" \
-  -d '{"operation":"review","actor_id":"local-user"}'
-```
-
-The review operation is deterministic and does not spend a model call.
-
-## Provision the exact ledger
-
-```bash
-aws cloudformation deploy \
-  --template-file infra/template.yaml \
-  --stack-name loose-ends-data \
-  --capabilities CAPABILITY_NAMED_IAM
-```
-
-Read the stack outputs, then:
-
-1. Set `LOOSE_ENDS_TABLE` in the runtime environment.
-2. Add the emitted `CommitmentsPolicyArn` to the runtime’s `additionalPolicies` in `agentcore/agentcore.json`.
-3. Run `agentcore deploy --dry-run`, then `agentcore deploy`.
-
-Once deployed, pass the actor through AgentCore identity rather than the payload:
-
-```bash
-agentcore invoke \
-  --user-id local-user \
-  --session-id loose-ends-demo-session-0000000001 \
-  "I promised Mom I would call the dentist tomorrow"
-```
-
-The deployed app intentionally refuses to fall back to a local file when `LOOSE_ENDS_TABLE` is absent.
-
-The deployed AWS resource names and `LOOSE_ENDS_*` environment variables retain
-their original identifiers to preserve the live runtime, DynamoDB table, and
-deployment history during the Promise Pocket rebrand.
-
-## What comes next
-
-See [the build sequence](docs/ROADMAP.md). The next meaningful milestone is an AWS-deployed end-to-end pass: capture a commitment through AgentCore, verify the DynamoDB record, then review it without generating noise.
-
-## Connect the Alexa Custom Skill
-
-After the AgentCore runtime is deployed, copy its ARN and your Alexa Skill ID,
-then deploy the adapter with AWS SAM:
-
-```bash
-sam build --template-file infra/alexa-template.yaml
-sam deploy --guided \
-  --stack-name loose-ends-alexa \
-  --capabilities CAPABILITY_IAM \
-  --parameter-overrides \
-    AlexaSkillId=amzn1.ask.skill.REPLACE_ME \
-    AgentRuntimeArn=arn:aws:bedrock-agentcore:us-east-1:ACCOUNT:runtime/REPLACE_ME
-```
-
-SAM prints `AlexaLambdaArn`. In the Alexa Developer Console:
-
-1. Open **Build → Endpoint** and choose **AWS Lambda ARN**.
-2. Paste `AlexaLambdaArn` into the **Default Region** field and save.
-3. Open **JSON Editor**, paste `alexa/interaction-model.json`, save, and build.
-4. In **Test**, enable development testing and say: “Alexa, open Promise Pocket.”
-
-The adapter verifies the Alexa application ID, hashes Alexa's opaque user ID,
-and passes that stable pseudonymous identity to AgentCore. It never writes the
-commitment ledger directly.

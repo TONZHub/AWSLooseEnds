@@ -1,27 +1,24 @@
-__pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
-.ruff_cache/
-.venv/
-.data/
-
-agentcore/.env.local
-agentcore/aws-targets.json
-agentcore/.cli/
-agentcore/cdk/
-
-.DS_Store
-.idea/
-.vscode/
-
-# Gradle
+# Gradle and Build Files
 .gradle/
 build/
-android-app/build/
+app/build/
+.build-outputs/
+
+# Android Studio / IntelliJ / VS Code
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Secrets & Environment Variables
+.env
 local.properties
 
-# Memory dumps
-*.hprof
+# Android Build Outputs & Keystores
+*.apk
+*.aab
+debug.keystore
+debug.keystore.base64
 
-
+# OS / Misc
+Thumbs.db

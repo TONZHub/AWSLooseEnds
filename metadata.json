@@ -1,0 +1,8 @@
+{
+  "name": "Promise Pocket",
+  "description": "A quiet place for the things you mean to do — captures commitments, tracks obligations deterministically, and surfaces only items needing human attention.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
