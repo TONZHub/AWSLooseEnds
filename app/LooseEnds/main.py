@@ -22,9 +22,14 @@ service = CommitmentService(build_store(settings))
 def _actor_id(payload: dict[str, Any], context: Any | None) -> str:
     """Resolve actor identity from AgentCore, with local-only fallbacks."""
 
-    actor_id = getattr(context, "user_id", None)
-    if not actor_id and settings.local_dev:
-        actor_id = payload.get("actor_id") or settings.dev_actor
+    if settings.local_dev:
+        actor_id = (
+            payload.get("actor_id")
+            or settings.dev_actor
+            or getattr(context, "user_id", None)
+        )
+    else:
+        actor_id = getattr(context, "user_id", None)
     if not isinstance(actor_id, str) or not actor_id.strip():
         raise ValueError(
             "authenticated AgentCore user_id is required outside local development"
