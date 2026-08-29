@@ -3,6 +3,9 @@ package com.mosslet.promisepocket.data.repository
 import com.mosslet.promisepocket.data.local.CommitmentDao
 import com.mosslet.promisepocket.data.model.CommitmentEntity
 import com.mosslet.promisepocket.data.model.CommitmentStatus
+import com.mosslet.promisepocket.data.remote.CommitmentRemoteMapper
+import com.mosslet.promisepocket.data.remote.RetrofitClient
+import com.mosslet.promisepocket.data.remote.SyncRequest
 import kotlinx.coroutines.flow.Flow
 
 class CommitmentRepository(private val dao: CommitmentDao) {
@@ -37,5 +40,28 @@ class CommitmentRepository(private val dao: CommitmentDao) {
 
     suspend fun deleteById(actorId: String, commitmentId: String) {
         dao.deleteById(actorId, commitmentId)
+    }
+
+    suspend fun syncWithCloud(actorId: String) {
+        if (actorId == "local-user") return
+
+        try {
+            val response = RetrofitClient.backendService.invokeOperation(
+                SyncRequest(operation = "review", actor_id = actorId)
+            )
+
+            response.items?.forEach { remote ->
+                val local = dao.getById(actorId, remote.commitment_id)
+                if (local == null) {
+                    dao.insert(CommitmentRemoteMapper.toEntity(remote))
+                } else {
+                    // Simple sync logic: remote wins for now
+                    dao.update(CommitmentRemoteMapper.toEntity(remote))
+                }
+            }
+        } catch (e: Exception) {
+            // Log error or handle gracefully
+            e.printStackTrace()
+        }
     }
 }

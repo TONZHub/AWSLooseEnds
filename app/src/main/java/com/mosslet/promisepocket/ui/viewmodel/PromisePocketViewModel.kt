@@ -182,12 +182,23 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
                     amazonAccountEmail = result.account.email
                 )
                 refreshData()
+                sync()
             }
             is AmazonAuthResult.Error -> {
                 _userNotification.value = result.message
                 _uiState.value = _uiState.value.copy(isAmazonAuthLoading = false)
                 refreshData()
             }
+        }
+    }
+
+    fun sync() {
+        val actor = _currentActor.value
+        if (actor == "local-user") return
+
+        viewModelScope.launch {
+            repository.syncWithCloud(actor)
+            refreshData()
         }
     }
 

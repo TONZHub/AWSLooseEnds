@@ -93,7 +93,7 @@ fun QuickCaptureBar(
                     onValueChange = { text = it },
                     placeholder = {
                         Text(
-                            "“I promised Mom I’d call tomorrow at noon…”",
+                            "I promised...",
                             fontSize = 14.sp,
                             maxLines = 1
                         )
