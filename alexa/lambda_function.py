@@ -275,7 +275,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         if name == "AMAZON.HelpIntent":
             return _speech(
                 _first_turn(
-                    event, "Say, remember that I need to call Mom tomorrow."
+                    event, "Try saying, I promised to call Mom tomorrow at noon."
                 ),
                 end_session=False,
                 reprompt="What should I remember?",
