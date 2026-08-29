@@ -10,10 +10,10 @@
   "runtimes": [
     {
       "name": "LooseEnds",
-      "description": "A quiet memory for commitments that interrupts only when human attention is required.",
+      "description": "Promise Pocket: a quiet memory for commitments that interrupts only when human attention is required.",
       "build": "CodeZip",
       "entrypoint": "main.py",
-      "codeLocation": "app/LooseEnds",
+      "codeLocation": "app/PromisePocket",
       "runtimeVersion": "PYTHON_3_12",
       "protocol": "HTTP",
       "networkMode": "PUBLIC",
