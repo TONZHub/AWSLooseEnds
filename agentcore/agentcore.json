@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.agentcore.aws.dev/v1/agentcore.json",
+  "name": "LooseEnds",
+  "version": 1,
+  "managedBy": "CDK",
+  "tags": {
+    "agentcore:created-by": "agentcore-cli",
+    "agentcore:project-name": "LooseEnds"
+  },
+  "runtimes": [
+    {
+      "name": "LooseEnds",
+      "description": "A quiet memory for commitments that interrupts only when human attention is required.",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": "app/LooseEnds",
+      "runtimeVersion": "PYTHON_3_12",
+      "protocol": "HTTP",
+      "networkMode": "PUBLIC",
+      "authorizerType": "AWS_IAM",
+      "instrumentation": {
+        "enableOtel": true
+      },
+      "envVars": [
+        {
+          "name": "MODEL_ID",
+          "value": "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+        }
+      ],
+      "additionalPolicies": []
+    }
+  ],
+  "memories": [],
+  "knowledgeBases": [],
+  "credentials": [],
+  "evaluators": [],
+  "onlineEvalConfigs": [],
+  "agentCoreGateways": [],
+  "policyEngines": [],
+  "configBundles": [],
+  "abTests": [],
+  "harnesses": [],
+  "datasets": [],
+  "payments": []
+}
+
