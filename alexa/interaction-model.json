@@ -1,7 +1,7 @@
 {
   "interactionModel": {
     "languageModel": {
-      "invocationName": "loose ends",
+      "invocationName": "promise pocket",
       "intents": [
         {
           "name": "CaptureCommitmentIntent",
@@ -27,13 +27,13 @@
           ]
         },
         {
-          "name": "ReviewLooseEndsIntent",
+          "name": "ReviewPromisePocketIntent",
           "slots": [],
           "samples": [
             "what needs me",
             "what do I need to do",
-            "review my loose ends",
-            "check my loose ends"
+            "review my promise pocket",
+            "check my promise pocket"
           ]
         },
         {"name": "AMAZON.CancelIntent", "samples": []},
