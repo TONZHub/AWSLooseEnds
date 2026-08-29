@@ -14,14 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -44,9 +42,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.promisepocket.ui.theme.SandGold
-import com.example.promisepocket.ui.theme.Slate200
-import com.example.promisepocket.ui.theme.Slate800
+import com.example.promisepocket.ui.theme.PromisePink
 import com.example.promisepocket.ui.theme.Slate900
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -71,7 +67,7 @@ fun QuickCaptureBar(
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 4.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, Slate200),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -87,7 +83,7 @@ fun QuickCaptureBar(
                     Icon(
                         imageVector = Icons.Default.AutoAwesome,
                         contentDescription = "Examples",
-                        tint = SandGold,
+                        tint = PromisePink,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -126,7 +122,7 @@ fun QuickCaptureBar(
                             .size(28.dp)
                             .padding(4.dp),
                         strokeWidth = 2.5.dp,
-                        color = Slate800
+                        color = PromisePink
                     )
                 } else {
                     IconButton(
@@ -138,8 +134,8 @@ fun QuickCaptureBar(
                         },
                         enabled = text.isNotBlank(),
                         colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (text.isNotBlank()) Slate800 else Color.Transparent,
-                            contentColor = if (text.isNotBlank()) Color.White else Slate200
+                            containerColor = if (text.isNotBlank()) PromisePink else Color.Transparent,
+                            contentColor = if (text.isNotBlank()) Slate900 else MaterialTheme.colorScheme.onSurfaceVariant
                         ),
                         modifier = Modifier
                             .size(40.dp)
