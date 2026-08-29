@@ -20,19 +20,20 @@ service = CommitmentService(build_store(settings))
 
 
 def _actor_id(payload: dict[str, Any], context: Any | None) -> str:
-    """Resolve actor identity from AgentCore, with local-only fallbacks."""
+    """Resolve identity supplied by an IAM-authorized invocation adapter.
 
-    if settings.local_dev:
-        actor_id = (
-            payload.get("actor_id")
-            or settings.dev_actor
-            or getattr(context, "user_id", None)
-        )
-    else:
-        actor_id = getattr(context, "user_id", None)
+    AgentCore's ``runtimeUserId`` binds user-scoped credentials but is not
+    currently exposed on the Python RequestContext. The Alexa Lambda therefore
+    sends the same pseudonymous ID in this payload as well. Runtime IAM controls
+    which adapters may invoke this entrypoint; prompt text never selects it.
+    """
+
+    actor_id = payload.get("actor_id")
+    if settings.local_dev and not actor_id:
+        actor_id = settings.dev_actor
     if not isinstance(actor_id, str) or not actor_id.strip():
         raise ValueError(
-            "authenticated AgentCore user_id is required outside local development"
+            "actor_id from an IAM-authorized invocation adapter is required"
         )
     return actor_id.strip()
 
