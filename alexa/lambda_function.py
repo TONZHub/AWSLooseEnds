@@ -49,6 +49,13 @@ def _speech(
     return payload
 
 
+def _first_turn(event: dict[str, Any], text: str) -> str:
+    """Identify the skill when Alexa routes directly into a new session."""
+    if event.get("session", {}).get("new") is True:
+        return f"Promise Pocket here. {text}"
+    return text
+
+
 def _verify_skill(event: dict[str, Any]) -> None:
     application_id = (
         event.get("context", {})
@@ -114,7 +121,7 @@ def _capture(event: dict[str, Any], intent: dict[str, Any]):
     commitment = _slot_value(intent, "commitment")
     if not commitment:
         return _speech(
-            "What should I remember?",
+            _first_turn(event, "What should I hold onto?"),
             end_session=False,
             reprompt="Tell me the promise or task you want me to remember.",
         )
@@ -127,16 +134,21 @@ def _capture(event: dict[str, Any], intent: dict[str, Any]):
         if captured and captured[0].get("missing_information"):
             question = captured[0]["missing_information"][0]
             return _speech(
-                question,
+                _first_turn(event, question),
                 end_session=False,
                 reprompt=question,
                 session_attributes={
                     "pendingCommitmentId": captured[0]["commitment_id"]
                 },
             )
-        return _speech("Got it. I tucked that loose end away.")
+        return _speech(
+            _first_turn(event, "Got it. I tucked that loose end away.")
+        )
     return _speech(
-        "I didn't hear a definite commitment there. What should I keep track of?",
+        _first_turn(
+            event,
+            "I didn't hear a definite commitment there. What should I keep track of?",
+        ),
         end_session=False,
         reprompt="Tell me what you need to do and when.",
     )
@@ -146,12 +158,12 @@ def _review(event: dict[str, Any]):
     result = _invoke(event, {"operation": "review"})
     items = result.get("items", [])
     if not items:
-        return _speech("Nothing needs you right now.")
+        return _speech(_first_turn(event, "Nothing needs you right now."))
     prompts = [item.get("prompt") or item.get("summary") for item in items[:3]]
     prompts = [prompt for prompt in prompts if isinstance(prompt, str)]
     if len(items) > 3:
         prompts.append(f"And {len(items) - 3} more.")
-    return _speech(" ".join(prompts))
+    return _speech(_first_turn(event, " ".join(prompts)))
 
 
 def _clarify(event: dict[str, Any], intent: dict[str, Any]):
