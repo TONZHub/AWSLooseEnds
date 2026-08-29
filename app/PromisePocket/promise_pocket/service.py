@@ -24,6 +24,7 @@ def _has_explicit_clock_time(text: str) -> bool:
             text,
             re.IGNORECASE,
         )
+        or re.search(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b", text)
         or re.search(r"\bat\s+\d{1,2}(?::\d{2})?\b", text, re.IGNORECASE)
     )
 
