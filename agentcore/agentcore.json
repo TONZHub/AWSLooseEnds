@@ -25,9 +25,15 @@
         {
           "name": "MODEL_ID",
           "value": "us.amazon.nova-lite-v1:0"
+        },
+        {
+          "name": "LOOSE_ENDS_TABLE",
+          "value": "loose-ends-commitments"
         }
       ],
-      "additionalPolicies": []
+      "additionalPolicies": [
+        "arn:aws:iam::568608118800:policy/loose-ends-commitments-runtime"
+      ]
     }
   ],
   "memories": [],
