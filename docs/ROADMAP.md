@@ -50,4 +50,4 @@ Definition of done: the same commitment survives a runtime restart and appears o
 2. Show the normalized DynamoDB record.
 3. Review before the deadline: no interruption.
 4. Review after the deadline: one human attention item.
-5. Show that Loose Ends did not call, send, book, or pay on the user’s behalf.
+5. Show that Promise Pocket did not call, send, book, or pay on the user’s behalf.
