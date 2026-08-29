@@ -17,6 +17,8 @@ class CommitmentStore(Protocol):
 
     def list_for_actor(self, actor_id: str) -> list[Commitment]: ...
 
+    def get(self, actor_id: str, commitment_id: str) -> Commitment | None: ...
+
 
 class InMemoryCommitmentStore:
     def __init__(self, commitments: Iterable[Commitment] = ()) -> None:
@@ -27,6 +29,10 @@ class InMemoryCommitmentStore:
 
     def list_for_actor(self, actor_id: str) -> list[Commitment]:
         return [item for item in self._items.values() if item.actor_id == actor_id]
+
+    def get(self, actor_id: str, commitment_id: str) -> Commitment | None:
+        item = self._items.get(commitment_id)
+        return item if item is not None and item.actor_id == actor_id else None
 
 
 class LocalJsonCommitmentStore:
@@ -65,6 +71,18 @@ class LocalJsonCommitmentStore:
     def list_for_actor(self, actor_id: str) -> list[Commitment]:
         with self._lock:
             return [item for item in self._read() if item.actor_id == actor_id]
+
+    def get(self, actor_id: str, commitment_id: str) -> Commitment | None:
+        with self._lock:
+            return next(
+                (
+                    item
+                    for item in self._read()
+                    if item.actor_id == actor_id
+                    and item.commitment_id == commitment_id
+                ),
+                None,
+            )
 
 
 class DynamoDbCommitmentStore:
@@ -108,6 +126,17 @@ class DynamoDbCommitmentStore:
             item.pop("next_review_at", None)
         return [Commitment.model_validate(item) for item in items]
 
+    def get(self, actor_id: str, commitment_id: str) -> Commitment | None:
+        response = self._table.get_item(
+            Key={"actor_id": actor_id, "commitment_id": commitment_id}
+        )
+        item = response.get("Item")
+        if item is None:
+            return None
+        item.pop("actor_status", None)
+        item.pop("next_review_at", None)
+        return Commitment.model_validate(item)
+
 
 def build_store(settings: Settings) -> CommitmentStore:
     if settings.table_name:
@@ -121,4 +150,3 @@ def build_store(settings: Settings) -> CommitmentStore:
         "LOOSE_ENDS_TABLE is required outside local development; refusing "
         "to use ephemeral runtime storage"
     )
-
