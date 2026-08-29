@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from collections.abc import Callable
 from typing import Any
 
 from strands import Agent, ToolContext, tool
@@ -45,7 +46,10 @@ def _parse_optional_datetime(value: str | None) -> datetime | None:
     return parsed
 
 
-def make_capture_tool(service: CommitmentService):
+def make_capture_tool(
+    service: CommitmentService,
+    on_capture: Callable[[str], None] | None = None,
+):
     @tool(context=True)
     def capture_commitment(
         summary: str,
@@ -82,6 +86,9 @@ def make_capture_tool(service: CommitmentService):
             missing_information=missing_information or [],
         )
 
+        if on_capture is not None:
+            on_capture(commitment.commitment_id)
+
         captured_ids = tool_context.invocation_state.setdefault(
             "captured_commitment_ids", []
         )
@@ -91,11 +98,14 @@ def make_capture_tool(service: CommitmentService):
     return capture_commitment
 
 
-def build_agent(service: CommitmentService, model_id: str) -> Agent:
+def build_agent(
+    service: CommitmentService,
+    model_id: str,
+    on_capture: Callable[[str], None] | None = None,
+) -> Agent:
     return Agent(
         model=model_id,
-        tools=[make_capture_tool(service)],
+        tools=[make_capture_tool(service, on_capture=on_capture)],
         system_prompt=SYSTEM_PROMPT,
         callback_handler=None,
     )
-
