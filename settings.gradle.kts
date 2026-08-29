@@ -21,3 +21,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Promise Pocket"
 include(":app")
+include(":android-app")
+

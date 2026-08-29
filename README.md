@@ -65,7 +65,7 @@ still needs an API key tied to the exact Android package and signing certificate
 
 1. In the Login with Amazon console, create or select the **Promise Pocket**
    security profile and add Android settings.
-2. Register package `com.aistudio.promisepocket.kzpxtq` with both the MD5 and
+2. Register package `com.mosslet.promisepocket` with both the MD5 and
    SHA-256 fingerprints from the keystore used to sign the APK.
 3. Copy `app/src/main/assets/api_key.txt.example` to
    `app/src/main/assets/api_key.txt`, then replace its contents with the generated

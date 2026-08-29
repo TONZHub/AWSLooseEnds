@@ -28,3 +28,10 @@ debug.keystore.base64
 
 # OS / Misc
 Thumbs.db
+*.hprof
+
+# Project specific
+.venv/
+*.egg-info/
+agentcore/
+.data/

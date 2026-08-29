@@ -8,26 +8,17 @@ plugins {
 }
 
 android {
-    namespace = "com.example.promisepocket"
+    namespace = "com.mosslet.promisepocket"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.aistudio.promisepocket.kzpxtq"
+        applicationId = "com.mosslet.promisepocket"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    signingConfigs {
-        getByName("debug") {
-            storeFile = file("${rootDir}/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
     }
 
     buildTypes {
@@ -37,18 +28,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
-        }
-        debug {
-            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "21"
     }
     buildFeatures {
         compose = true
@@ -64,11 +51,6 @@ secrets {
 }
 
 dependencies {
-    // Amazon distributes Login with Amazon as a signed local SDK rather than a
-    // Maven artifact. The vendored jar is version 3.1.6 from Amazon's official
-    // Android SDK bundle; see THIRD_PARTY_NOTICES.md.
-    implementation(files("libs/login-with-amazon-sdk.jar"))
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -81,6 +63,9 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
+
+    // Amazon SDK
+    implementation(files("libs/login-with-amazon-sdk.jar"))
 
     // Room
     implementation(libs.androidx.room.runtime)
