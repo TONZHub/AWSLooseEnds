@@ -42,7 +42,7 @@ class PromiseParser {
                 ""
             }
 
-            if (apiKey.isNotBlank() && apiKey != "null") {
+            if (apiKey.isNotBlank() && apiKey != "null" && apiKey != "placeholder_api_key") {
                 try {
                     val parsed = callGemini(rawText, apiKey, userTimezone)
                     if (parsed != null) {
