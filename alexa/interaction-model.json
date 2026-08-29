@@ -11,7 +11,13 @@
           "samples": [
             "remember {commitment}",
             "remember that {commitment}",
+            "I need to {commitment}",
+            "I have to {commitment}",
+            "I should {commitment}",
+            "I promised to {commitment}",
+            "don't let me forget to {commitment}",
             "save {commitment}",
+            "write down {commitment}",
             "keep track of {commitment}"
           ]
         },

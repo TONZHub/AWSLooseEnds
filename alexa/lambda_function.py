@@ -214,13 +214,19 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return _clarify(event, intent)
         if name == "AMAZON.HelpIntent":
             return _speech(
-                "Say, remember that I need to call Mom tomorrow.",
+                _first_turn(
+                    event, "Say, remember that I need to call Mom tomorrow."
+                ),
                 end_session=False,
                 reprompt="What should I remember?",
             )
         if name in {"AMAZON.CancelIntent", "AMAZON.StopIntent"}:
             return _speech("Okay. Your promises will wait here.")
-        return _speech("Try saying, remember that I need to call Mom tomorrow.")
+        return _speech(
+            _first_turn(
+                event, "Try saying, remember that I need to call Mom tomorrow."
+            )
+        )
     except Exception:
         LOGGER.exception("Alexa request failed")
         return _speech("Promise Pocket hit a snag. Please try again in a moment.")
