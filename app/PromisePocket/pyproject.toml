@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aws-promise-pocket"
+version = "0.1.0"
+description = "Promise Pocket: a quiet memory for promises, built with Strands and Amazon Bedrock AgentCore."
+requires-python = ">=3.12"
+dependencies = [
+  "aws-opentelemetry-distro",
+  "bedrock-agentcore>=1.9.1,<2",
+  "boto3>=1.40,<2",
+  "botocore[crt]>=1.35,<2",
+  "pydantic>=2.11,<3",
+  "strands-agents>=1.15.0,<2"
+]
+
+[project.scripts]
+promise-pocket-review = "promise_pocket.review_cli:main"
+
+[tool.setuptools.packages.find]
+include = ["promise_pocket*"]
