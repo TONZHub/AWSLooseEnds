@@ -1,0 +1,36 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "loose ends",
+      "intents": [
+        {
+          "name": "CaptureCommitmentIntent",
+          "slots": [
+            {"name": "commitment", "type": "AMAZON.SearchQuery"}
+          ],
+          "samples": [
+            "remember {commitment}",
+            "remember that {commitment}",
+            "save {commitment}",
+            "keep track of {commitment}"
+          ]
+        },
+        {
+          "name": "ReviewLooseEndsIntent",
+          "slots": [],
+          "samples": [
+            "what needs me",
+            "what do I need to do",
+            "review my loose ends",
+            "check my loose ends"
+          ]
+        },
+        {"name": "AMAZON.CancelIntent", "samples": []},
+        {"name": "AMAZON.HelpIntent", "samples": []},
+        {"name": "AMAZON.StopIntent", "samples": []},
+        {"name": "AMAZON.FallbackIntent", "samples": []}
+      ],
+      "types": []
+    }
+  }
+}

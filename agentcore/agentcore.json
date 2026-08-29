@@ -24,7 +24,7 @@
       "envVars": [
         {
           "name": "MODEL_ID",
-          "value": "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+          "value": "us.amazon.nova-lite-v1:0"
         }
       ],
       "additionalPolicies": []
@@ -43,4 +43,3 @@
   "datasets": [],
   "payments": []
 }
-

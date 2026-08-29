@@ -20,6 +20,15 @@
 
 Definition of done: the same commitment survives a runtime restart and appears only when the test clock makes it actionable.
 
+## M1.5 — Alexa voice front door
+
+- [x] Add a thin Alexa Lambda adapter over the AgentCore API.
+- [x] Add a Custom Skill interaction model for capture and review.
+- [x] Bind the Lambda trigger to one Alexa Skill ID.
+- [x] Pass a pseudonymous Alexa actor through AgentCore runtime identity.
+- [ ] Deploy the adapter and paste its Lambda ARN into the Alexa endpoint.
+- [ ] Run capture and quiet-review tests in the Alexa simulator.
+
 ## M2 — Quiet scheduled review
 
 - [ ] Trigger review on a schedule with EventBridge.
@@ -35,12 +44,6 @@ Definition of done: the same commitment survives a runtime restart and appears o
 - [ ] Require explicit approval before sending, buying, booking, paying, or deciding.
 - [ ] Record every requested and granted approval.
 
-## M4 — Voice front door
-
-- [ ] Add Alexa capture as an adapter over the same API.
-- [ ] Keep identity, timezone, and confirmation behavior consistent with chat.
-- [ ] Do not move commitment logic into the Alexa skill.
-
 ## Demo spine
 
 1. Say: “I promised Mom I’d call the dentist tomorrow.”
@@ -48,4 +51,3 @@ Definition of done: the same commitment survives a runtime restart and appears o
 3. Review before the deadline: no interruption.
 4. Review after the deadline: one human attention item.
 5. Show that Loose Ends did not call, send, book, or pay on the user’s behalf.
-
