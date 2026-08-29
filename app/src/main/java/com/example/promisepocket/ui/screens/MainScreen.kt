@@ -75,13 +75,11 @@ import com.example.promisepocket.ui.components.ClarificationDialog
 import com.example.promisepocket.ui.components.CommitmentCard
 import com.example.promisepocket.ui.components.CommitmentDetailDialog
 import com.example.promisepocket.ui.components.QuickCaptureBar
-import com.example.promisepocket.ui.theme.SandGold
-import com.example.promisepocket.ui.theme.SandGoldLight
-import com.example.promisepocket.ui.theme.Slate100
-import com.example.promisepocket.ui.theme.Slate200
+import com.example.promisepocket.ui.theme.PromiseCream
+import com.example.promisepocket.ui.theme.PromisePeach
+import com.example.promisepocket.ui.theme.PromisePink
 import com.example.promisepocket.ui.theme.Slate400
-import com.example.promisepocket.ui.theme.Slate600
-import com.example.promisepocket.ui.theme.Slate800
+import com.example.promisepocket.ui.theme.Slate700
 import com.example.promisepocket.ui.theme.Slate900
 import com.example.promisepocket.ui.viewmodel.FilterTab
 import com.example.promisepocket.ui.viewmodel.PromisePocketViewModel
@@ -112,10 +110,11 @@ fun MainScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Image(
-                            painter = painterResource(id = R.drawable.promise_pocket_icon_1788013703332),
+                            painter = painterResource(id = R.drawable.promise_pocket_icon_actual),
                             contentDescription = "Promise Pocket Logo",
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(34.dp)
+                                .size(38.dp)
                                 .clip(CircleShape)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
@@ -123,12 +122,12 @@ fun MainScreen(
                             Text(
                                 text = "Promise Pocket",
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                color = Slate900
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "Exact ledger of obligations",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Slate600
+                                color = PromisePink.copy(alpha = 0.86f)
                             )
                         }
                     }
@@ -141,14 +140,14 @@ fun MainScreen(
                         Icon(
                             imageVector = if (isSearchOpen) Icons.Default.Close else Icons.Default.Search,
                             contentDescription = "Search",
-                            tint = Slate800
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
                     Box {
                         Surface(
                             shape = RoundedCornerShape(20.dp),
-                            color = Slate100,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
                                 .clickable { isActorMenuOpen = true }
@@ -161,14 +160,14 @@ fun MainScreen(
                                 Icon(
                                     imageVector = Icons.Default.AccountCircle,
                                     contentDescription = null,
-                                    tint = Slate700,
+                                    tint = PromisePeach,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = state.currentActor,
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    color = Slate900
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
@@ -190,7 +189,7 @@ fun MainScreen(
                                                 Icon(
                                                     imageVector = Icons.Default.Check,
                                                     contentDescription = null,
-                                                    tint = SandGold,
+                                                    tint = PromisePink,
                                                     modifier = Modifier.size(16.dp)
                                                 )
                                             }
@@ -219,7 +218,6 @@ fun MainScreen(
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Optional Search Bar
             AnimatedVisibility(visible = isSearchOpen) {
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
@@ -250,24 +248,21 @@ fun MainScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Calm Hero Banner
                 item {
                     HeroBannerCard()
                 }
 
-                // Needs Human Attention Section (Deterministic Policy)
                 if (state.attentionItems.isNotEmpty() && state.filterTab != FilterTab.COMPLETED) {
                     item {
                         AttentionSection(
                             items = state.attentionItems,
                             onClarifyClick = { viewModel.openClarification(it) },
-                            onResolveClick = { viewModel.setStatus(it, com.example.promisepocket.data.model.CommitmentStatus.COMPLETED) },
+                            onResolveClick = { viewModel.setStatus(it, CommitmentStatus.COMPLETED) },
                             onItemClick = { viewModel.openDetail(it) }
                         )
                     }
                 }
 
-                // Filter Tabs
                 item {
                     FilterTabsRow(
                         currentTab = state.filterTab,
@@ -278,7 +273,6 @@ fun MainScreen(
                     )
                 }
 
-                // Empty State or List
                 if (state.displayedCommitments.isEmpty()) {
                     item {
                         EmptyCommitmentsView(state.filterTab)
@@ -301,7 +295,6 @@ fun MainScreen(
                 }
             }
 
-            // Quick Capture Input Bar at Bottom
             Surface(
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 8.dp,
@@ -325,7 +318,6 @@ fun MainScreen(
         }
     }
 
-    // Clarification Dialog
     state.activeClarificationItem?.let { item ->
         ClarificationDialog(
             item = item,
@@ -336,7 +328,6 @@ fun MainScreen(
         )
     }
 
-    // Commitment Detail Dialog
     state.activeDetailCommitment?.let { commitment ->
         CommitmentDetailDialog(
             commitment = commitment,
@@ -375,7 +366,6 @@ private fun HeroBannerCard() {
                     .clip(RoundedCornerShape(20.dp))
             )
 
-            // Gradient scrim
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -407,7 +397,7 @@ private fun HeroBannerCard() {
                 Text(
                     text = "Captures ordinary commitments. Interrupts only when truly needed.",
                     style = MaterialTheme.typography.bodyMedium.copy(
-                        color = SandGoldLight,
+                        color = PromiseCream,
                         fontSize = 13.sp
                     )
                 )
@@ -424,6 +414,11 @@ private fun FilterTabsRow(
     attentionCount: Int,
     honoredCount: Int
 ) {
+    val selectedColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+        selectedLabelColor = PromisePink
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -434,10 +429,7 @@ private fun FilterTabsRow(
             selected = currentTab == FilterTab.ALL,
             onClick = { onTabSelected(FilterTab.ALL) },
             label = { Text("Active ($pendingCount)") },
-            colors = FilterChipDefaults.filterChipColors(
-                selectedContainerColor = Slate800,
-                selectedLabelColor = Color.White
-            ),
+            colors = selectedColors,
             modifier = Modifier.testTag("tab_all")
         )
 
@@ -446,10 +438,7 @@ private fun FilterTabsRow(
                 selected = currentTab == FilterTab.ATTENTION,
                 onClick = { onTabSelected(FilterTab.ATTENTION) },
                 label = { Text("Needs Attention ($attentionCount)") },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Slate800,
-                    selectedLabelColor = Color.White
-                ),
+                colors = selectedColors,
                 modifier = Modifier.testTag("tab_attention")
             )
         }
@@ -458,10 +447,7 @@ private fun FilterTabsRow(
             selected = currentTab == FilterTab.COMPLETED,
             onClick = { onTabSelected(FilterTab.COMPLETED) },
             label = { Text("Honored ($honoredCount)") },
-            colors = FilterChipDefaults.filterChipColors(
-                selectedContainerColor = Slate800,
-                selectedLabelColor = Color.White
-            ),
+            colors = selectedColors,
             modifier = Modifier.testTag("tab_completed")
         )
     }
@@ -472,7 +458,7 @@ private fun EmptyCommitmentsView(tab: FilterTab) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Slate200),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 24.dp)
@@ -496,18 +482,16 @@ private fun EmptyCommitmentsView(tab: FilterTab) {
                     else -> "No open commitments in your pocket"
                 },
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
-                color = Slate800,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "Capture a promise below in plain speech or text.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Slate600,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
         }
     }
 }
-
-val Slate700 = Color(0xFF334155)

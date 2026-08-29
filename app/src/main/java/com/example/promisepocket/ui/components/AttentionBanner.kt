@@ -1,8 +1,5 @@
 package com.example.promisepocket.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.HelpOutline
@@ -47,7 +43,7 @@ import com.example.promisepocket.ui.theme.CoralDue
 import com.example.promisepocket.ui.theme.CoralDueBg
 import com.example.promisepocket.ui.theme.IndigoBlocked
 import com.example.promisepocket.ui.theme.IndigoBlockedBg
-import com.example.promisepocket.ui.theme.Slate700
+import com.example.promisepocket.ui.theme.PromisePink
 import com.example.promisepocket.ui.theme.Slate900
 
 @Composable
@@ -94,7 +90,7 @@ fun AttentionSection(
                     text = "${items.size}",
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = CoralDue
+                    color = AmberClarify
                 )
             }
         }
@@ -134,7 +130,7 @@ fun AttentionCard(
         )
         AttentionReason.DUE -> Quadruple(
             CoralDueBg,
-            CoralDue,
+            AmberClarify,
             Icons.Default.NotificationsActive,
             "Due Now"
         )
@@ -215,8 +211,8 @@ fun AttentionCard(
                     FilledTonalButton(
                         onClick = onClarifyClick,
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = AmberClarify,
-                            contentColor = MaterialTheme.colorScheme.surface
+                            containerColor = PromisePink,
+                            contentColor = Slate900
                         ),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.testTag("btn_clarify_${item.commitmentId}")
@@ -227,8 +223,8 @@ fun AttentionCard(
                     FilledTonalButton(
                         onClick = onResolveClick,
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = CoralDue,
-                            contentColor = MaterialTheme.colorScheme.surface
+                            containerColor = PromisePink,
+                            contentColor = Slate900
                         ),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.testTag("btn_resolve_${item.commitmentId}")

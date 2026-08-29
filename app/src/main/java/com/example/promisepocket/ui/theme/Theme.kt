@@ -17,47 +17,49 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val LightColorScheme = lightColorScheme(
-    primary = Slate800,
+    primary = PromiseBerry,
     onPrimary = Color.White,
-    primaryContainer = Slate100,
-    onPrimaryContainer = Slate900,
-    secondary = Slate600,
+    primaryContainer = PromiseBlush,
+    onPrimaryContainer = PromiseBerry,
+    secondary = PromiseMauve,
     onSecondary = Color.White,
-    secondaryContainer = Slate100,
-    onSecondaryContainer = Slate800,
-    tertiary = SandGold,
+    secondaryContainer = PromiseCream,
+    onSecondaryContainer = Slate900,
+    tertiary = PromisePink,
     onTertiary = Slate900,
-    tertiaryContainer = SandGoldLight,
+    tertiaryContainer = PromisePeach,
     onTertiaryContainer = Slate900,
     background = Slate50,
     onBackground = Slate900,
     surface = Color.White,
     onSurface = Slate900,
-    surfaceVariant = Slate100,
+    surfaceVariant = Color(0xFFF7ECEF),
     onSurfaceVariant = Slate600,
-    outline = Slate200,
-    outlineVariant = Slate100
+    outline = Color(0xFFD8C8CE),
+    outlineVariant = Color(0xFFECE2E5)
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = SandGold,
+    primary = PromisePink,
     onPrimary = Slate900,
-    primaryContainer = Slate800,
-    onPrimaryContainer = Color.White,
-    secondary = Slate400,
+    primaryContainer = Color(0xFF3A2230),
+    onPrimaryContainer = PromiseBlush,
+    secondary = PromisePeach,
     onSecondary = Slate900,
-    secondaryContainer = Slate700,
-    onSecondaryContainer = Color.White,
-    tertiary = SandGoldLight,
+    secondaryContainer = Color(0xFF49323B),
+    onSecondaryContainer = PromiseCream,
+    tertiary = PromiseBlush,
     onTertiary = Slate900,
+    tertiaryContainer = PromiseBerry,
+    onTertiaryContainer = PromiseCream,
     background = Slate900,
-    onBackground = Slate100,
+    onBackground = Color(0xFFF7F2F4),
     surface = Slate800,
-    onSurface = Color.White,
+    onSurface = Color(0xFFF8F3F5),
     surfaceVariant = Slate700,
-    onSurfaceVariant = Slate200,
-    outline = Slate600,
-    outlineVariant = Slate700
+    onSurfaceVariant = Color(0xFFD9CDD2),
+    outline = Color(0xFF6F5C67),
+    outlineVariant = Color(0xFF3C4658)
 )
 
 @Composable
@@ -68,8 +70,7 @@ fun PromisePocketTheme(
 ) {
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext
-                .current
+            val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         darkTheme -> DarkColorScheme
