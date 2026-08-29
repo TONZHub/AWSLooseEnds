@@ -227,12 +227,32 @@ def _review(event: dict[str, Any]):
 
 
 def _clarify(event: dict[str, Any], intent: dict[str, Any]):
-    commitment_id = event.get("session", {}).get("attributes", {}).get(
-        "pendingCommitmentId"
+    session_attributes = dict(
+        event.get("session", {}).get("attributes", {}) or {}
     )
+    commitment_id = session_attributes.get("pendingCommitmentId")
     answer = _slot_value(intent, "answer")
-    if not commitment_id or not answer:
-        return _speech("What time should I use?", end_session=False)
+
+    if not commitment_id:
+        LOGGER.warning("Alexa clarification arrived without pending commitment state")
+        return _speech(
+            "I lost track of which promise you meant. Please tell me the promise again.",
+            end_session=False,
+            reprompt="Tell me the promise again, including the day if you know it.",
+        )
+
+    if not answer:
+        # Alexa can match the clarification intent while still failing to fill the
+        # AMAZON.TIME slot. Keep the pending commitment in the response so one
+        # imperfect recognition does not permanently strand the conversation.
+        LOGGER.info("Alexa clarification intent arrived without an answer time slot")
+        return _speech(
+            "What time should I use?",
+            end_session=False,
+            reprompt="Say a time, like 9 A.M.",
+            session_attributes=session_attributes,
+        )
+
     result = _invoke(
         event,
         {
@@ -244,7 +264,12 @@ def _clarify(event: dict[str, Any], intent: dict[str, Any]):
     )
     if result.get("updated_commitment_ids"):
         return _speech("Perfect. I added the time to that loose end.")
-    return _speech("I still need a specific time.", end_session=False)
+    return _speech(
+        "I still need a specific time.",
+        end_session=False,
+        reprompt="Say a time, like 9 A.M.",
+        session_attributes=session_attributes,
+    )
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
