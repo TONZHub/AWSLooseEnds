@@ -55,7 +55,7 @@ class AlexaAdapterTests(unittest.TestCase):
     def test_launch_invites_capture(self):
         response = lambda_function.lambda_handler(event(), None)
         self.assertFalse(response["response"]["shouldEndSession"])
-        self.assertIn("What should I remember", response["response"]["outputSpeech"]["text"])
+        self.assertIn("Promise Pocket is listening", response["response"]["outputSpeech"]["text"])
 
     def test_wrong_skill_is_rejected_without_invoking_runtime(self):
         request = event("CaptureCommitmentIntent", "call Mom")
@@ -125,7 +125,7 @@ class AlexaAdapterTests(unittest.TestCase):
             return_value={"attention_required": False, "items": []},
         ):
             response = lambda_function.lambda_handler(
-                event("ReviewLooseEndsIntent"), None
+                event("ReviewPromisePocketIntent"), None
             )
         self.assertEqual(
             "Nothing needs you right now.",

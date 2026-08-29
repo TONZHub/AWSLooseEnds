@@ -1,4 +1,4 @@
-"""Validated domain records for commitments and attention requests."""
+"""Validated Promise Pocket records and attention requests."""
 
 from __future__ import annotations
 
@@ -77,4 +77,3 @@ class AttentionItem(BaseModel):
     reason: AttentionReason
     prompt: str
     due_at: datetime | None = None
-

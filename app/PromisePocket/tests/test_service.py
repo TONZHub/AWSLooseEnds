@@ -5,9 +5,9 @@ import unittest
 
 from pydantic import ValidationError
 
-from loose_ends.models import AttentionReason, Commitment
-from loose_ends.service import CommitmentService
-from loose_ends.storage import InMemoryCommitmentStore, LocalJsonCommitmentStore
+from promise_pocket.models import AttentionReason, Commitment
+from promise_pocket.service import CommitmentService
+from promise_pocket.storage import InMemoryCommitmentStore, LocalJsonCommitmentStore
 
 
 NOW = datetime(2026, 8, 29, 12, 0, tzinfo=timezone.utc)

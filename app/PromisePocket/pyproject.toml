@@ -3,9 +3,9 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aws-loose-ends"
+name = "aws-promise-pocket"
 version = "0.1.0"
-description = "A quiet memory for promises, built with Strands and Amazon Bedrock AgentCore."
+description = "Promise Pocket: a quiet memory for promises, built with Strands and Amazon Bedrock AgentCore."
 requires-python = ">=3.12"
 dependencies = [
   "aws-opentelemetry-distro",
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-loose-ends-review = "loose_ends.review_cli:main"
+promise-pocket-review = "promise_pocket.review_cli:main"
 
 [tool.setuptools.packages.find]
-include = ["loose_ends*"]
+include = ["promise_pocket*"]

@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Alexa Custom Skill adapter for the Loose Ends AgentCore runtime.
+Description: Alexa Custom Skill adapter for the Promise Pocket AgentCore runtime.
 
 Parameters:
   AlexaSkillId:
@@ -18,7 +18,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: loose-ends-alexa-adapter
-      Description: Thin Alexa adapter for the Loose Ends AgentCore runtime.
+      Description: Thin Alexa adapter for the Promise Pocket AgentCore runtime.
       CodeUri: ../alexa/
       Handler: lambda_function.lambda_handler
       Runtime: python3.12

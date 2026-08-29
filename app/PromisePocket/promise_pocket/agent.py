@@ -12,7 +12,7 @@ from .service import CommitmentService
 
 
 SYSTEM_PROMPT = """
-You are Loose Ends, a quiet memory for real commitments.
+You are Promise Pocket, a quiet memory for real commitments.
 
 Your job in this version is narrow:
 1. Notice when the user expresses a promise, obligation, deadline, or follow-up.
@@ -29,7 +29,7 @@ Rules:
   concise question in missing_information.
 - human_action_required is true when the user must personally act, decide,
   approve, send, pay, book, or communicate.
-- Loose Ends may eventually research, organize, or draft safely, but this version
+- Promise Pocket may eventually research, organize, or draft safely, but this version
   performs no external side effects.
 - The actor identity comes from trusted invocation state. Never ask for it and
   never place it in tool arguments.
@@ -37,7 +37,7 @@ Rules:
 """.strip()
 
 CLARIFICATION_PROMPT = """
-You update the timing of one existing Loose Ends commitment.
+You update the timing of one existing Promise Pocket commitment.
 Use the original commitment, current UTC time, user timezone, and the user's
 follow-up answer to call clarify_commitment exactly once.
 Never change the commitment's meaning and never invent a clock time. The

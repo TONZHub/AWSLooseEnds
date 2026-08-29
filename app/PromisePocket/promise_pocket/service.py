@@ -1,4 +1,4 @@
-"""Deterministic commitment capture and attention policy."""
+"""Deterministic Promise Pocket capture and attention policy."""
 
 from __future__ import annotations
 

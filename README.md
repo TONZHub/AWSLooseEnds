@@ -1,8 +1,8 @@
-# Loose Ends
+# Promise Pocket
 
-**A quiet memory for promises.**
+**A quiet place for the things you mean to do.**
 
-Loose Ends captures commitments in ordinary language, keeps an exact ledger of them, and interrupts only when a person genuinely needs to act, clarify, decide, approve, send, or pay.
+Promise Pocket captures commitments in ordinary language, keeps an exact ledger of them, and interrupts only when a person genuinely needs to act, clarify, decide, approve, send, or pay.
 
 > “I promised Mom I’d call the dentist tomorrow.”
 
@@ -28,7 +28,7 @@ flowchart TD
 
 ## Current boundaries
 
-- Loose Ends may remember, organize, research, or prepare without interrupting.
+- Promise Pocket may remember, organize, research, or prepare without interrupting.
 - It must ask before external side effects such as sending, buying, booking, approving, or making a consequential decision.
 - It never invents a deadline. Missing timing becomes a clarification, not a confident guess.
 - DynamoDB is the source of truth for commitments. AgentCore Memory may later hold conversational context, but semantic memory is not an obligation ledger.
@@ -38,7 +38,7 @@ flowchart TD
 
 ```text
 agentcore/                 AgentCore Runtime project configuration
-app/LooseEnds/             Python agent, domain logic, stores, and tests
+app/PromisePocket/         Python agent, domain logic, stores, and tests
 docs/                      Architecture and build sequence
 infra/template.yaml        DynamoDB table and least-privilege access policy
 ```
@@ -48,7 +48,7 @@ infra/template.yaml        DynamoDB table and least-privilege access policy
 The tests exercise capture, persistence, and the human-attention policy without calling a model or AWS.
 
 ```bash
-cd app/LooseEnds
+cd app/PromisePocket
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -115,6 +115,10 @@ agentcore invoke \
 
 The deployed app intentionally refuses to fall back to a local file when `LOOSE_ENDS_TABLE` is absent.
 
+The deployed AWS resource names and `LOOSE_ENDS_*` environment variables retain
+their original identifiers to preserve the live runtime, DynamoDB table, and
+deployment history during the Promise Pocket rebrand.
+
 ## What comes next
 
 See [the build sequence](docs/ROADMAP.md). The next meaningful milestone is an AWS-deployed end-to-end pass: capture a commitment through AgentCore, verify the DynamoDB record, then review it without generating noise.
@@ -139,7 +143,7 @@ SAM prints `AlexaLambdaArn`. In the Alexa Developer Console:
 1. Open **Build → Endpoint** and choose **AWS Lambda ARN**.
 2. Paste `AlexaLambdaArn` into the **Default Region** field and save.
 3. Open **JSON Editor**, paste `alexa/interaction-model.json`, save, and build.
-4. In **Test**, enable development testing and say: “Alexa, open Loose Ends.”
+4. In **Test**, enable development testing and say: “Alexa, open Promise Pocket.”
 
 The adapter verifies the Alexa application ID, hashes Alexa's opaque user ID,
 and passes that stable pseudonymous identity to AgentCore. It never writes the

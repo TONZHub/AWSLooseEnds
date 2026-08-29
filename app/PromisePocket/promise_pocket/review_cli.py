@@ -20,7 +20,7 @@ def _aware_datetime(value: str) -> datetime:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Return only Loose Ends that need human attention."
+        description="Return only Promise Pocket items that need human attention."
     )
     parser.add_argument("--actor", required=True)
     parser.add_argument("--now", type=_aware_datetime)
@@ -40,4 +40,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

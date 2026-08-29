@@ -1,4 +1,4 @@
-"""Exact commitment stores for local development and DynamoDB."""
+"""Exact Promise Pocket stores for local development and DynamoDB."""
 
 from __future__ import annotations
 

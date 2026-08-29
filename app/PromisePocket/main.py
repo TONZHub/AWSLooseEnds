@@ -1,4 +1,4 @@
-"""Amazon Bedrock AgentCore Runtime entrypoint for Loose Ends."""
+"""Amazon Bedrock AgentCore Runtime entrypoint for Promise Pocket."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from typing import Any
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
-from loose_ends.agent import build_agent, build_clarification_agent
-from loose_ends.service import CommitmentService
-from loose_ends.settings import Settings
-from loose_ends.storage import build_store
+from promise_pocket.agent import build_agent, build_clarification_agent
+from promise_pocket.service import CommitmentService
+from promise_pocket.settings import Settings
+from promise_pocket.storage import build_store
 
 
 app = BedrockAgentCoreApp()

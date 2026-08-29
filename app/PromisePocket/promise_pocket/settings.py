@@ -1,4 +1,4 @@
-"""Environment-backed configuration with a fail-closed deployed mode."""
+"""Promise Pocket configuration with a fail-closed deployed mode."""
 
 from __future__ import annotations
 
