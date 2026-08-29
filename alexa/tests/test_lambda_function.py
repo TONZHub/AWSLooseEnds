@@ -104,6 +104,14 @@ class AlexaAdapterTests(unittest.TestCase):
             response["response"]["outputSpeech"]["text"],
         )
 
+    def test_first_turn_fallback_identifies_promise_pocket(self):
+        response = lambda_function.lambda_handler(event("UnknownIntent"), None)
+        self.assertTrue(
+            response["response"]["outputSpeech"]["text"].startswith(
+                "Promise Pocket here."
+            )
+        )
+
     def test_capture_with_missing_time_keeps_session_open(self):
         with patch.object(
             lambda_function,
