@@ -29,6 +29,15 @@ Definition of done: the same commitment survives a runtime restart and appears o
 - [ ] Deploy the adapter and paste its Lambda ARN into the Alexa endpoint.
 - [ ] Run capture and quiet-review tests in the Alexa simulator.
 
+## M1.75 — Shared Amazon identity
+
+- [x] Add Login with Amazon to the Android app.
+- [x] Replace demo actor switching with local/Amazon account state.
+- [x] Verify linked Alexa tokens before deriving the shared actor ID.
+- [ ] Register the Android package and signing fingerprints in the LWA console.
+- [ ] Configure Alexa authorization-code account linking with the same LWA profile.
+- [ ] Add authenticated Android API sync so Room and DynamoDB converge.
+
 ## M2 — Quiet scheduled review
 
 - [ ] Trigger review on a schedule with EventBridge.

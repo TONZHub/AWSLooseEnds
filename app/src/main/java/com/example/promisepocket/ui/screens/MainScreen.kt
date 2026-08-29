@@ -28,13 +28,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -47,6 +46,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -63,6 +63,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -88,13 +91,15 @@ import com.example.promisepocket.ui.viewmodel.PromisePocketViewModel
 @Composable
 fun MainScreen(
     viewModel: PromisePocketViewModel,
+    onSignInWithAmazon: () -> Unit,
+    onSignOutFromAmazon: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     var isSearchOpen by remember { mutableStateOf(false) }
-    var isActorMenuOpen by remember { mutableStateOf(false) }
+    var isAccountDialogOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.userNotification) {
         state.userNotification?.let {
@@ -150,7 +155,7 @@ fun MainScreen(
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
-                                .clickable { isActorMenuOpen = true }
+                                .clickable { isAccountDialogOpen = true }
                                 .testTag("btn_actor_menu")
                         ) {
                             Row(
@@ -165,43 +170,20 @@ fun MainScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = state.currentActor,
+                                    text = if (state.isAmazonSignedIn) {
+                                        state.amazonAccountName
+                                            ?.substringBefore(' ')
+                                            ?.takeIf(String::isNotBlank)
+                                            ?: "Amazon"
+                                    } else {
+                                        "Local"
+                                    },
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
 
-                        DropdownMenu(
-                            expanded = isActorMenuOpen,
-                            onDismissRequest = { isActorMenuOpen = false }
-                        ) {
-                            state.availableActors.forEach { actor ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text(actor)
-                                            if (actor == state.currentActor) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Check,
-                                                    contentDescription = null,
-                                                    tint = PromisePink,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
-                                        }
-                                    },
-                                    onClick = {
-                                        viewModel.setActor(actor)
-                                        isActorMenuOpen = false
-                                    }
-                                )
-                            }
-                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -343,6 +325,81 @@ fun MainScreen(
             }
         )
     }
+
+    if (isAccountDialogOpen) {
+        AmazonAccountDialog(
+            isSignedIn = state.isAmazonSignedIn,
+            isLoading = state.isAmazonAuthLoading,
+            accountName = state.amazonAccountName,
+            accountEmail = state.amazonAccountEmail,
+            onSignIn = onSignInWithAmazon,
+            onSignOut = onSignOutFromAmazon,
+            onDismiss = { isAccountDialogOpen = false }
+        )
+    }
+}
+
+@Composable
+private fun AmazonAccountDialog(
+    isSignedIn: Boolean,
+    isLoading: Boolean,
+    accountName: String?,
+    accountEmail: String?,
+    onSignIn: () -> Unit,
+    onSignOut: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (isSignedIn) "Amazon account connected" else "Your Promise Pocket") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (isSignedIn) {
+                    Text(
+                        text = accountName ?: "Amazon account",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                    accountEmail?.let {
+                        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text(
+                        "This is the shared identity Promise Pocket will use for the app and Alexa. " +
+                            "Commitments still stay on this phone until cloud sync is switched on.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Text(
+                        "Sign in to give this phone and the Alexa skill one shared Amazon identity. " +
+                            "You can keep using Promise Pocket locally without an account.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            when {
+                isLoading -> CircularProgressIndicator(
+                    modifier = Modifier.size(28.dp),
+                    strokeWidth = 3.dp
+                )
+                isSignedIn -> TextButton(onClick = onSignOut) { Text("Sign out") }
+                else -> Image(
+                    painter = painterResource(R.drawable.btnlwa_gold_loginwithamazon),
+                    contentDescription = "Sign in with Amazon",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .width(210.dp)
+                        .height(48.dp)
+                        .semantics { role = Role.Button }
+                        .clickable(onClick = onSignIn)
+                        .testTag("btn_sign_in_with_amazon")
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
 }
 
 @Composable

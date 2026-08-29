@@ -7,6 +7,8 @@ import json
 import logging
 import os
 from typing import Any
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 import boto3
 
@@ -17,6 +19,7 @@ LOGGER.setLevel(logging.INFO)
 AGENT_RUNTIME_ARN = os.environ.get("AGENT_RUNTIME_ARN", "")
 ALEXA_SKILL_ID = os.environ.get("ALEXA_SKILL_ID", "")
 DEFAULT_TIMEZONE = os.environ.get("LOOSE_ENDS_TIMEZONE", "America/New_York")
+LWA_CLIENT_ID = os.environ.get("LWA_CLIENT_ID", "")
 
 _agentcore = None
 
@@ -67,7 +70,64 @@ def _verify_skill(event: dict[str, Any]) -> None:
         raise ValueError("request application ID does not match this skill")
 
 
+def _hashed_actor_id(prefix: str, source: str) -> str:
+    return f"{prefix}-" + hashlib.sha256(source.encode()).hexdigest()
+
+
+def _alexa_access_token(event: dict[str, Any]) -> str | None:
+    token = (
+        event.get("context", {})
+        .get("System", {})
+        .get("user", {})
+        .get("accessToken")
+    ) or event.get("session", {}).get("user", {}).get("accessToken")
+    return token if isinstance(token, str) and token else None
+
+
+def _read_lwa_json(request: Request) -> dict[str, Any]:
+    with urlopen(request, timeout=5) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Login with Amazon returned an invalid response")
+    return payload
+
+
+def _linked_amazon_actor_id(access_token: str) -> str:
+    if not LWA_CLIENT_ID:
+        raise RuntimeError("LWA_CLIENT_ID is not configured")
+
+    token_info_url = "https://api.amazon.com/auth/o2/tokeninfo?" + urlencode(
+        {"access_token": access_token}
+    )
+    token_info = _read_lwa_json(
+        Request(token_info_url, headers={"Accept": "application/json"})
+    )
+    if token_info.get("aud") != LWA_CLIENT_ID:
+        raise ValueError("Login with Amazon token audience does not match")
+
+    profile = _read_lwa_json(
+        Request(
+            "https://api.amazon.com/user/profile",
+            headers={
+                "Accept": "application/json",
+                "Accept-Language": "en-US",
+                "Authorization": f"Bearer {access_token}",
+            },
+        )
+    )
+    user_id = profile.get("user_id")
+    if not isinstance(user_id, str) or not user_id:
+        raise ValueError("Login with Amazon profile is missing user_id")
+    return _hashed_actor_id("amazon", user_id)
+
+
 def _actor_id(event: dict[str, Any]) -> str:
+    access_token = _alexa_access_token(event)
+    if access_token:
+        # Account linking and the Android app use the same LWA security profile,
+        # so both surfaces resolve to one pseudonymous ledger identity.
+        return _linked_amazon_actor_id(access_token)
+
     alexa_user_id = (
         event.get("context", {}).get("System", {}).get("user", {}).get("userId")
         or event.get("session", {}).get("user", {}).get("userId")
@@ -75,7 +135,7 @@ def _actor_id(event: dict[str, Any]) -> str:
     if not isinstance(alexa_user_id, str) or not alexa_user_id:
         raise ValueError("Alexa user ID is missing")
     # Keep Amazon's opaque identifier out of the commitment ledger and logs.
-    return "alexa-" + hashlib.sha256(alexa_user_id.encode()).hexdigest()
+    return _hashed_actor_id("alexa", alexa_user_id)
 
 
 def _session_id(event: dict[str, Any]) -> str:
