@@ -1,4 +1,4 @@
-"""Thin Alexa Custom Skill adapter for the Loose Ends AgentCore runtime."""
+"""Thin Alexa Custom Skill adapter for the Promise Pocket AgentCore runtime."""
 
 from __future__ import annotations
 
@@ -183,7 +183,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         request_type = request.get("type")
         if request_type == "LaunchRequest":
             return _speech(
-                "Loose Ends is listening. What should I remember?",
+                "Promise Pocket is listening. What should I hold onto?",
                 end_session=False,
                 reprompt="Tell me a promise or task to remember.",
             )
@@ -196,7 +196,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         name = intent.get("name")
         if name == "CaptureCommitmentIntent":
             return _capture(event, intent)
-        if name == "ReviewLooseEndsIntent":
+        if name == "ReviewPromisePocketIntent":
             return _review(event)
         if name == "ClarifyCommitmentIntent":
             return _clarify(event, intent)
@@ -207,8 +207,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 reprompt="What should I remember?",
             )
         if name in {"AMAZON.CancelIntent", "AMAZON.StopIntent"}:
-            return _speech("Okay. Your loose ends will wait here.")
+            return _speech("Okay. Your promises will wait here.")
         return _speech("Try saying, remember that I need to call Mom tomorrow.")
     except Exception:
         LOGGER.exception("Alexa request failed")
-        return _speech("Loose Ends hit a snag. Please try again in a moment.")
+        return _speech("Promise Pocket hit a snag. Please try again in a moment.")
