@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
+import re
 
 from .models import (
     AttentionItem,
@@ -13,6 +14,18 @@ from .models import (
     utc_now,
 )
 from .storage import CommitmentStore
+
+
+def _has_explicit_clock_time(text: str) -> bool:
+    return bool(
+        re.search(r"\b(?:noon|midnight)\b", text, re.IGNORECASE)
+        or re.search(
+            r"\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b",
+            text,
+            re.IGNORECASE,
+        )
+        or re.search(r"\bat\s+\d{1,2}(?::\d{2})?\b", text, re.IGNORECASE)
+    )
 
 
 class CommitmentService:
@@ -36,6 +49,11 @@ class CommitmentService:
         missing_information: list[str],
     ) -> Commitment:
         now = self._clock()
+        questions = list(missing_information)
+        if due_at is not None and not _has_explicit_clock_time(raw_text):
+            due_at = None
+            if not questions:
+                questions.append("What time should I bring this back?")
         commitment = Commitment(
             actor_id=actor_id,
             summary=summary,
@@ -43,7 +61,7 @@ class CommitmentService:
             due_at=due_at,
             people=people,
             human_action_required=human_action_required,
-            missing_information=missing_information,
+            missing_information=questions,
             created_at=now,
             updated_at=now,
         )
@@ -107,4 +125,3 @@ class CommitmentService:
                 item.commitment_id,
             ),
         )
-

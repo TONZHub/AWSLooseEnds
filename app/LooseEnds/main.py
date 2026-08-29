@@ -87,7 +87,12 @@ def invoke(payload: dict[str, Any], context: Any | None = None) -> dict[str, Any
 
     # A fresh agent prevents in-process conversation history from crossing
     # actors. AgentCore Memory can provide scoped continuity in a later slice.
-    agent = build_agent(service=service, model_id=settings.model_id)
+    captured_commitment_ids: list[str] = []
+    agent = build_agent(
+        service=service,
+        model_id=settings.model_id,
+        on_capture=captured_commitment_ids.append,
+    )
     result = agent(
         contextual_prompt,
         actor_id=actor_id,
@@ -99,7 +104,7 @@ def invoke(payload: dict[str, Any], context: Any | None = None) -> dict[str, Any
     return {
         "operation": "capture",
         "result": result.message,
-        "captured_commitment_ids": result.state.get("captured_commitment_ids", []),
+        "captured_commitment_ids": captured_commitment_ids,
     }
 
 

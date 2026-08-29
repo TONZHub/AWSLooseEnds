@@ -22,7 +22,7 @@ class CommitmentServiceTests(unittest.TestCase):
         values = {
             "actor_id": "zoe",
             "summary": "Call the dentist for Mom",
-            "raw_text": "I promised Mom I would call the dentist tomorrow",
+            "raw_text": "I promised Mom I would call the dentist tomorrow at noon",
             "due_at": NOW + timedelta(days=1),
             "people": ["Mom"],
             "human_action_required": True,
@@ -71,6 +71,18 @@ class CommitmentServiceTests(unittest.TestCase):
         self.assertEqual(AttentionReason.CLARIFICATION, attention[0].reason)
         self.assertEqual("When should I bring this back?", attention[0].prompt)
 
+    def test_model_cannot_invent_clock_time_for_date_only_words(self):
+        captured = self.capture(
+            raw_text="I need to call the pharmacy tomorrow",
+            due_at=NOW + timedelta(hours=15),
+        )
+
+        self.assertIsNone(captured.due_at)
+        self.assertEqual(
+            ["What time should I bring this back?"],
+            captured.missing_information,
+        )
+
     def test_actor_records_are_isolated(self):
         self.capture(actor_id="zoe", due_at=NOW - timedelta(minutes=1))
         self.capture(actor_id="someone-else", due_at=NOW - timedelta(minutes=1))
@@ -113,4 +125,3 @@ class LocalJsonStoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

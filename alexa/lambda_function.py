@@ -115,7 +115,11 @@ def _capture(event: dict[str, Any], intent: dict[str, Any]):
     )
     if result.get("captured_commitment_ids"):
         return _speech("Got it. I tucked that loose end away.")
-    return _speech("I didn't hear a definite commitment there, so I didn't save it.")
+    return _speech(
+        "I didn't hear a definite commitment there. What should I keep track of?",
+        end_session=False,
+        reprompt="Tell me what you need to do and when.",
+    )
 
 
 def _review(event: dict[str, Any]):
