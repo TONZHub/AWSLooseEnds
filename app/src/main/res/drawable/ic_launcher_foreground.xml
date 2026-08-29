@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/promise_pocket_icon_1788013703332"
+        android:drawable="@drawable/promise_pocket_icon_actual"
         android:gravity="center" />
 </layer-list>
