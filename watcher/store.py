@@ -17,6 +17,12 @@ class GoogleConnection:
     last_checked_at: datetime | None
 
 
+@dataclass(frozen=True, slots=True)
+class OAuthStateContext:
+    actor_id: str
+    code_verifier: str
+
+
 class ConnectionStore:
     def __init__(self, database_path: str, encryption_key: str) -> None:
         self._path = Path(database_path)
@@ -49,10 +55,16 @@ class ConnectionStore:
                 CREATE TABLE IF NOT EXISTS oauth_states (
                     state TEXT PRIMARY KEY,
                     actor_id TEXT NOT NULL,
-                    expires_at TEXT NOT NULL
+                    expires_at TEXT NOT NULL,
+                    code_verifier TEXT
                 )
                 """
             )
+            columns = {
+                str(row[1]) for row in db.execute("PRAGMA table_info(oauth_states)")
+            }
+            if "code_verifier" not in columns:
+                db.execute("ALTER TABLE oauth_states ADD COLUMN code_verifier TEXT")
 
     def save_oauth_state(
         self,
@@ -60,18 +72,27 @@ class ConnectionStore:
         state: str,
         actor_id: str,
         expires_at: datetime,
+        code_verifier: str,
     ) -> None:
         with self._connect() as db:
             db.execute(
-                "INSERT OR REPLACE INTO oauth_states(state, actor_id, expires_at) VALUES(?, ?, ?)",
-                (state, actor_id, expires_at.isoformat()),
+                """
+                INSERT OR REPLACE INTO oauth_states(
+                    state, actor_id, expires_at, code_verifier
+                ) VALUES(?, ?, ?, ?)
+                """,
+                (state, actor_id, expires_at.isoformat(), code_verifier),
             )
 
-    def consume_oauth_state(self, state: str) -> str | None:
+    def consume_oauth_state(self, state: str) -> OAuthStateContext | None:
         now = datetime.now(timezone.utc)
         with self._connect() as db:
             row = db.execute(
-                "SELECT actor_id, expires_at FROM oauth_states WHERE state = ?",
+                """
+                SELECT actor_id, expires_at, code_verifier
+                FROM oauth_states
+                WHERE state = ?
+                """,
                 (state,),
             ).fetchone()
             db.execute("DELETE FROM oauth_states WHERE state = ?", (state,))
@@ -80,7 +101,13 @@ class ConnectionStore:
         expires_at = datetime.fromisoformat(row["expires_at"])
         if expires_at <= now:
             return None
-        return str(row["actor_id"])
+        code_verifier = str(row["code_verifier"] or "")
+        if not code_verifier:
+            return None
+        return OAuthStateContext(
+            actor_id=str(row["actor_id"]),
+            code_verifier=code_verifier,
+        )
 
     def save_google_connection(
         self,
