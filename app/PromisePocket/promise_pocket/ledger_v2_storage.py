@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .ledger_v2 import PromiseLedgerStore, PromiseRecord
+from .ledger_v2 import InMemoryPromiseLedgerStore, PromiseLedgerStore, PromiseRecord
 from .settings import Settings
 
 
@@ -85,11 +85,13 @@ class DynamoDbPromiseLedgerStore(PromiseLedgerStore):
 
 
 def build_ledger_v2_store(settings: Settings) -> PromiseLedgerStore:
-    if not settings.table_name:
-        raise RuntimeError(
-            "LOOSE_ENDS_TABLE is required for the Pocket Promise v2 ledger"
+    if settings.table_name:
+        return DynamoDbPromiseLedgerStore(
+            table_name=settings.table_name,
+            region_name=settings.region_name,
         )
-    return DynamoDbPromiseLedgerStore(
-        table_name=settings.table_name,
-        region_name=settings.region_name,
+    if settings.local_dev:
+        return InMemoryPromiseLedgerStore()
+    raise RuntimeError(
+        "LOOSE_ENDS_TABLE is required for the Pocket Promise v2 ledger"
     )
