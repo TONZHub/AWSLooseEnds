@@ -11,6 +11,7 @@ from promise_pocket.ledger_v2 import (
     PromiseRecord,
     PromiseState,
 )
+from promise_pocket.ledger_v2_storage import DynamoDbPromiseLedgerStore
 
 
 NOW = datetime(2026, 8, 30, 17, 0, tzinfo=timezone.utc)
@@ -163,6 +164,52 @@ class PromiseLedgerV2Tests(unittest.TestCase):
                 source="gmail",
                 due_at=datetime(2026, 9, 1, 18, 0),
             )
+
+
+class DynamoDbV2CompatibilityTests(unittest.TestCase):
+    def record(self):
+        return PromiseRecord(
+            actor_id="zoe",
+            deliverable="send the final mockups",
+            raw_text="I'll send the final mockups by Tuesday evening.",
+            people=["Jordan"],
+            due_at=NOW + timedelta(days=2),
+            confidence=0.94,
+            source="gmail",
+            source_id="gmail-message-123",
+            status=PromiseState.ACTIVE,
+            confirmed_at=NOW,
+            created_at=NOW,
+            updated_at=NOW,
+        )
+
+    def test_v2_item_keeps_existing_table_keys_and_marks_record_type(self):
+        record = self.record()
+
+        item = DynamoDbPromiseLedgerStore._to_item(record)
+
+        self.assertEqual("zoe", item["actor_id"])
+        self.assertEqual(record.commitment_id, item["commitment_id"])
+        self.assertEqual("promise_v2", item["record_type"])
+        self.assertEqual("zoe#active", item["actor_status"])
+
+    def test_v2_item_round_trips(self):
+        record = self.record()
+        item = DynamoDbPromiseLedgerStore._to_item(record)
+
+        restored = DynamoDbPromiseLedgerStore._from_item(item)
+
+        self.assertEqual(record, restored)
+
+    def test_legacy_commitment_item_is_ignored(self):
+        legacy_item = {
+            "actor_id": "zoe",
+            "commitment_id": "legacy-123",
+            "summary": "Call Mom",
+            "status": "pending",
+        }
+
+        self.assertIsNone(DynamoDbPromiseLedgerStore._from_item(legacy_item))
 
 
 if __name__ == "__main__":
