@@ -81,17 +81,38 @@ The AWS credential used by Render should be a dedicated least-privilege identity
 that can invoke only the deployed AgentCore runtime. Do not put an administrator
 AWS key on Render.
 
+## Watcher admin access
+
+The Gmail-connect, manual-scan, and status routes use HTTP Basic authentication.
+Use:
+
+- username: `admin`
+- password: the value of `WATCHER_ADMIN_KEY`
+
+`/healthz` and the simple landing page remain public. The Google callback is
+protected by the high-entropy, single-use OAuth state created by the
+admin-protected start route.
+
 ## First end-to-end test
 
 1. Deploy the Render service.
 2. Verify `/healthz` returns `ok: true`.
-3. Open `/auth/google/start` and authorize the test Gmail account.
-4. Send an email such as:
+3. Open `/auth/google/start`. When prompted for Basic auth, use username `admin`
+   and the `WATCHER_ADMIN_KEY` value as the password.
+4. Authorize the test Gmail account.
+5. Send an email such as:
    `I'll send you the final mockups by Tuesday evening.`
-5. Either wait for the watcher interval or POST `/scan-now` with the
-   `X-Watcher-Admin-Key` header.
-6. Inspect the v2 ledger. Expected state: `candidate`.
-7. Confirm the candidate through the v2 API/app. Expected state: `active`.
+6. Either wait for the watcher interval or manually POST `/scan-now` using the
+   same HTTP Basic credentials.
+7. Inspect the v2 ledger. Expected state: `candidate`.
+8. Confirm the candidate through the v2 API/app. Expected state: `active`.
+
+Example manual scan with curl:
+
+```bash
+curl -u "admin:$WATCHER_ADMIN_KEY" -X POST \
+  https://<your-render-service>.onrender.com/scan-now
+```
 
 ## Data minimization in this slice
 
@@ -102,6 +123,8 @@ AWS key on Render.
   than the full email/thread.
 - Google refresh tokens are encrypted before being written to SQLite.
 - OAuth state tokens are single-use and expire after ten minutes.
+- Reconnecting Gmail resets the scan cursor so a newly connected account cannot
+  inherit the previous account's checkpoint.
 
 ## Not built yet
 
