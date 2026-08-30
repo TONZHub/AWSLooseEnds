@@ -105,11 +105,18 @@ def _message_to_source(message: dict[str, Any]) -> dict[str, Any] | None:
         str(header.get("name", "")).casefold(): str(header.get("value", ""))
         for header in payload.get("headers", [])
     }
+    address_headers = [
+        value
+        for value in (
+            headers.get("to", ""),
+            headers.get("cc", ""),
+            headers.get("bcc", ""),
+        )
+        if value.strip()
+    ]
     participants = [
         address
-        for _, address in getaddresses(
-            [headers.get("to", ""), headers.get("cc", ""), headers.get("bcc", "")]
-        )
+        for _, address in getaddresses(address_headers)
         if address
     ]
     internal_ms = int(message.get("internalDate") or 0)
