@@ -17,7 +17,12 @@ from store import GoogleConnection
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 
-def build_oauth_flow(settings: WatcherSettings, *, state: str | None = None) -> Flow:
+def build_oauth_flow(
+    settings: WatcherSettings,
+    *,
+    state: str | None = None,
+    code_verifier: str | None = None,
+) -> Flow:
     client_config = {
         "web": {
             "client_id": settings.google_client_id,
@@ -31,6 +36,8 @@ def build_oauth_flow(settings: WatcherSettings, *, state: str | None = None) -> 
         client_config,
         scopes=GMAIL_SCOPES,
         state=state,
+        code_verifier=code_verifier,
+        autogenerate_code_verifier=False,
     )
     flow.redirect_uri = settings.google_redirect_uri
     return flow
