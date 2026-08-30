@@ -62,20 +62,25 @@ class ConnectionStoreTests(unittest.TestCase):
         self.assertEqual("second-refresh-token", reconnected.refresh_token)
         self.assertIsNone(reconnected.last_checked_at)
 
-    def test_oauth_state_is_one_time_and_expires(self):
+    def test_oauth_state_is_one_time_and_preserves_pkce_verifier(self):
         self.store.save_oauth_state(
             state="good-state",
             actor_id="amazon-demo",
             expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+            code_verifier="verifier-1234567890",
         )
 
-        self.assertEqual("amazon-demo", self.store.consume_oauth_state("good-state"))
+        context = self.store.consume_oauth_state("good-state")
+        self.assertIsNotNone(context)
+        self.assertEqual("amazon-demo", context.actor_id)
+        self.assertEqual("verifier-1234567890", context.code_verifier)
         self.assertIsNone(self.store.consume_oauth_state("good-state"))
 
         self.store.save_oauth_state(
             state="expired-state",
             actor_id="amazon-demo",
             expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+            code_verifier="expired-verifier",
         )
         self.assertIsNone(self.store.consume_oauth_state("expired-state"))
 
