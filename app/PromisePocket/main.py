@@ -1,14 +1,21 @@
-"""Amazon Bedrock AgentCore Runtime entrypoint for Promise Pocket."""
+"""Amazon Bedrock AgentCore Runtime entrypoint for Pocket Promise.
+
+The legacy Promise Pocket operations remain available while the v2 cross-system
+commitment ledger is built alongside them.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-import os
 from typing import Any
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
 from promise_pocket.agent import build_agent, build_clarification_agent
+from promise_pocket.arbiter_v2 import arbitrate_outgoing_message, build_arbiter_agent
+from promise_pocket.ingest_v2 import SourceMessage
+from promise_pocket.ledger_v2 import PromiseLedger
+from promise_pocket.ledger_v2_storage import build_ledger_v2_store
 from promise_pocket.service import CommitmentService
 from promise_pocket.settings import Settings
 from promise_pocket.storage import build_store
@@ -17,16 +24,11 @@ from promise_pocket.storage import build_store
 app = BedrockAgentCoreApp()
 settings = Settings.from_environment()
 service = CommitmentService(build_store(settings))
+v2_ledger = PromiseLedger(build_ledger_v2_store(settings))
 
 
 def _actor_id(payload: dict[str, Any], context: Any | None) -> str:
-    """Resolve identity supplied by an IAM-authorized invocation adapter.
-
-    AgentCore's ``runtimeUserId`` binds user-scoped credentials but is not
-    currently exposed on the Python RequestContext. The Alexa Lambda therefore
-    sends the same pseudonymous ID in this payload as well. Runtime IAM controls
-    which adapters may invoke this entrypoint; prompt text never selects it.
-    """
+    """Resolve identity supplied by an IAM-authorized invocation adapter."""
 
     actor_id = payload.get("actor_id")
     if settings.local_dev and not actor_id:
@@ -49,16 +51,122 @@ def _parse_now(value: Any) -> datetime:
     return parsed
 
 
+def _require_commitment_id(payload: dict[str, Any]) -> str:
+    commitment_id = payload.get("commitment_id")
+    if not isinstance(commitment_id, str) or not commitment_id.strip():
+        raise ValueError("commitment_id is required")
+    return commitment_id.strip()
+
+
+def _invoke_v2(
+    *,
+    operation: str,
+    payload: dict[str, Any],
+    actor_id: str,
+) -> dict[str, Any] | None:
+    """Handle Pocket Promise v2 operations, or return None for legacy routing."""
+
+    if operation == "v2_arbitrate":
+        raw_message = payload.get("source_message")
+        if not isinstance(raw_message, dict):
+            raise ValueError("source_message is required for v2_arbitrate")
+        message = SourceMessage.model_validate(raw_message)
+        if message.direction != "sent":
+            raise ValueError("v2_arbitrate only accepts outgoing source messages")
+
+        timezone_name = payload.get("timezone") or settings.timezone_name
+        if not isinstance(timezone_name, str) or not timezone_name.strip():
+            raise ValueError("timezone must be a non-empty IANA timezone name")
+
+        candidate_ids: list[str] = []
+        agent = build_arbiter_agent(
+            v2_ledger,
+            settings.model_id,
+            on_candidate=candidate_ids.append,
+        )
+        result = arbitrate_outgoing_message(
+            agent,
+            actor_id=actor_id,
+            message=message,
+            timezone_name=timezone_name,
+        )
+        candidates = [
+            v2_ledger.get(actor_id=actor_id, commitment_id=commitment_id)
+            for commitment_id in candidate_ids
+        ]
+        return {
+            "operation": operation,
+            "result": result,
+            "candidate_ids": candidate_ids,
+            "candidates": [
+                candidate.model_dump(mode="json")
+                for candidate in candidates
+                if candidate is not None
+            ],
+        }
+
+    if operation == "v2_list":
+        records = v2_ledger.list_for_actor(actor_id=actor_id)
+        return {
+            "operation": operation,
+            "items": [record.model_dump(mode="json") for record in records],
+        }
+
+    if operation == "v2_confirm":
+        record = v2_ledger.confirm(
+            actor_id=actor_id,
+            commitment_id=_require_commitment_id(payload),
+        )
+        return {"operation": operation, "item": record.model_dump(mode="json")}
+
+    if operation == "v2_done":
+        record = v2_ledger.mark_done(
+            actor_id=actor_id,
+            commitment_id=_require_commitment_id(payload),
+        )
+        return {"operation": operation, "item": record.model_dump(mode="json")}
+
+    if operation == "v2_reopen":
+        record = v2_ledger.reopen(
+            actor_id=actor_id,
+            commitment_id=_require_commitment_id(payload),
+        )
+        return {"operation": operation, "item": record.model_dump(mode="json")}
+
+    if operation == "v2_cancel":
+        record = v2_ledger.cancel(
+            actor_id=actor_id,
+            commitment_id=_require_commitment_id(payload),
+        )
+        return {"operation": operation, "item": record.model_dump(mode="json")}
+
+    if operation.startswith("v2_"):
+        raise ValueError(f"unsupported Pocket Promise v2 operation: {operation}")
+
+    return None
+
+
 @app.entrypoint
 def invoke(payload: dict[str, Any], context: Any | None = None) -> dict[str, Any]:
-    """Capture through Strands or review deterministically."""
+    """Route Pocket Promise v2 and legacy Promise Pocket operations."""
 
     if not isinstance(payload, dict):
         raise ValueError("payload must be a JSON object")
 
     actor_id = _actor_id(payload, context)
     operation = payload.get("operation", "capture")
+    if not isinstance(operation, str):
+        raise ValueError("operation must be a string")
 
+    v2_response = _invoke_v2(
+        operation=operation,
+        payload=payload,
+        actor_id=actor_id,
+    )
+    if v2_response is not None:
+        return v2_response
+
+    # ---- Legacy Promise Pocket path: retained until the v2 adapters replace it. ----
     if operation == "review":
         items = service.review(actor_id=actor_id, now=_parse_now(payload.get("now")))
         return {
@@ -100,7 +208,9 @@ def invoke(payload: dict[str, Any], context: Any | None = None) -> dict[str, Any
         }
 
     if operation != "capture":
-        raise ValueError("operation must be capture, clarify, or review")
+        raise ValueError(
+            "operation must be capture, clarify, review, or a supported v2 operation"
+        )
 
     prompt = payload.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
@@ -117,8 +227,6 @@ def invoke(payload: dict[str, Any], context: Any | None = None) -> dict[str, Any
         f"User message: {prompt.strip()}"
     )
 
-    # A fresh agent prevents in-process conversation history from crossing
-    # actors. AgentCore Memory can provide scoped continuity in a later slice.
     captured_commitment_ids: list[str] = []
     agent = build_agent(
         service=service,
