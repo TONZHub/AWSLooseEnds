@@ -40,6 +40,28 @@ class ConnectionStoreTests(unittest.TestCase):
         self.assertNotIn("refresh_token", public)
         self.assertNotIn(b"super-secret-refresh-token", self.path.read_bytes())
 
+    def test_reconnect_resets_scan_cursor(self):
+        self.store.save_google_connection(
+            actor_id="amazon-demo",
+            email="first@example.com",
+            refresh_token="first-refresh-token",
+            scopes=["https://www.googleapis.com/auth/gmail.readonly"],
+        )
+        self.store.update_last_checked(actor_id="amazon-demo", checked_at=NOW)
+        self.assertEqual(NOW, self.store.list_google_connections()[0].last_checked_at)
+
+        self.store.save_google_connection(
+            actor_id="amazon-demo",
+            email="second@example.com",
+            refresh_token="second-refresh-token",
+            scopes=["https://www.googleapis.com/auth/gmail.readonly"],
+        )
+
+        reconnected = self.store.list_google_connections()[0]
+        self.assertEqual("second@example.com", reconnected.email)
+        self.assertEqual("second-refresh-token", reconnected.refresh_token)
+        self.assertIsNone(reconnected.last_checked_at)
+
     def test_oauth_state_is_one_time_and_expires(self):
         self.store.save_oauth_state(
             state="good-state",
