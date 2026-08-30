@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: pocket-promise-watcher
+    runtime: python
+    rootDir: watcher
+    plan: 0.5c-512mb
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT --proxy-headers
+    healthCheckPath: /healthz
+    disk:
+      name: pocket-promise-watcher-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DATABASE_PATH
+        value: /var/data/pocket-promise.sqlite3
+      - key: POLL_INTERVAL_SECONDS
+        value: "600"
+      - key: POCKET_PROMISE_TIMEZONE
+        value: America/New_York
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: DEMO_ACTOR_ID
+        sync: false
+      - key: WATCHER_ADMIN_KEY
+        sync: false
+      - key: AGENT_RUNTIME_ARN
+        sync: false
+      - key: AWS_REGION
+        value: us-east-1
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
