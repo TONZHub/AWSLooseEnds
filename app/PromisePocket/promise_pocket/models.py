@@ -1,9 +1,8 @@
-"""Validated Promise Pocket records and attention requests."""
+"""Validated user-owned preference records for Promise Pocket."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from enum import StrEnum
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -13,45 +12,47 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class CommitmentStatus(StrEnum):
-    PENDING = "pending"
-    COMPLETED = "completed"
-    CANCELED = "canceled"
+class Preference(BaseModel):
+    """One explicit preference the user asked Promise Pocket to remember.
 
+    ``commitment_id`` is retained as the physical DynamoDB sort key so the
+    existing hackathon table can be reused without an infrastructure migration.
+    Product-facing code should use ``preference_id``.
+    """
 
-class AttentionReason(StrEnum):
-    CLARIFICATION = "clarification"
-    DUE = "due"
-    BLOCKED = "blocked"
-
-
-class Commitment(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     commitment_id: str = Field(default_factory=lambda: uuid4().hex)
     actor_id: str = Field(min_length=1)
-    summary: str = Field(min_length=1, max_length=240)
+    preference_key: str = Field(min_length=1, max_length=160)
+    category: str = Field(min_length=1, max_length=80)
+    statement: str = Field(min_length=1, max_length=500)
     raw_text: str = Field(min_length=1, max_length=4000)
-    due_at: datetime | None = None
-    people: list[str] = Field(default_factory=list)
-    human_action_required: bool
-    missing_information: list[str] = Field(default_factory=list)
-    blocked_reason: str | None = None
+    tags: list[str] = Field(default_factory=list)
     source: str = "chat"
-    status: CommitmentStatus = CommitmentStatus.PENDING
+    active: bool = True
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
-    @field_validator("due_at", "created_at", "updated_at")
+    @property
+    def preference_id(self) -> str:
+        return self.commitment_id
+
+    @field_validator("created_at", "updated_at")
     @classmethod
-    def require_aware_datetime(cls, value: datetime | None) -> datetime | None:
-        if value is not None and value.tzinfo is None:
+    def require_aware_datetime(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
             raise ValueError("datetime values must include a UTC offset")
         return value
 
-    @field_validator("people", "missing_information")
+    @field_validator("preference_key")
     @classmethod
-    def remove_empty_duplicates(cls, values: list[str]) -> list[str]:
+    def normalize_preference_key(cls, value: str) -> str:
+        return value.strip().casefold().replace(" ", "-")
+
+    @field_validator("tags")
+    @classmethod
+    def remove_empty_duplicate_tags(cls, values: list[str]) -> list[str]:
         result: list[str] = []
         seen: set[str] = set()
         for value in values:
@@ -61,19 +62,3 @@ class Commitment(BaseModel):
                 result.append(normalized)
                 seen.add(key)
         return result
-
-    @property
-    def next_review_at(self) -> datetime | None:
-        if self.missing_information or self.blocked_reason:
-            return self.created_at
-        return self.due_at
-
-
-class AttentionItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    commitment_id: str
-    summary: str
-    reason: AttentionReason
-    prompt: str
-    due_at: datetime | None = None
