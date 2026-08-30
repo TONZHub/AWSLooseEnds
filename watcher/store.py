@@ -103,6 +103,7 @@ class ConnectionStore:
                     email = excluded.email,
                     refresh_token = excluded.refresh_token,
                     scopes = excluded.scopes,
+                    last_checked_at = NULL,
                     updated_at = excluded.updated_at
                 """,
                 (actor_id, email, encrypted, " ".join(scopes), now, now),
