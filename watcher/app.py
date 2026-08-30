@@ -7,8 +7,9 @@ import logging
 import secrets
 from secrets import compare_digest
 
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from agentcore_client import PocketPromiseAgentCoreClient
 from google_client import (
@@ -28,6 +29,7 @@ logging.basicConfig(level=logging.INFO)
 settings = WatcherSettings.from_environment()
 store = ConnectionStore(settings.database_path, settings.token_encryption_key)
 agentcore = PocketPromiseAgentCoreClient(settings)
+security = HTTPBasic()
 
 
 async def scan_connection(connection: GoogleConnection) -> dict:
@@ -102,9 +104,17 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Pocket Promise Watcher", lifespan=lifespan)
 
 
-def require_admin(value: str | None) -> None:
-    if not value or not compare_digest(value, settings.admin_key):
-        raise HTTPException(status_code=401, detail="invalid watcher admin key")
+def require_admin(
+    credentials: HTTPBasicCredentials = Depends(security),
+) -> None:
+    username_ok = compare_digest(credentials.username, "admin")
+    password_ok = compare_digest(credentials.password, settings.admin_key)
+    if not (username_ok and password_ok):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid watcher admin credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
 
 
 @app.get("/healthz")
@@ -117,13 +127,13 @@ def home() -> str:
     return """
     <html><body style="font-family: sans-serif; max-width: 720px; margin: 3rem auto;">
       <h1>Pocket Promise Watcher</h1>
-      <p>The watcher is alive. Connect the demo Gmail account to begin observing sent mail.</p>
-      <p><a href="/auth/google/start">Connect Gmail</a></p>
+      <p>The watcher is alive.</p>
+      <p><a href="/auth/google/start">Connect the demo Gmail account</a> (admin protected)</p>
     </body></html>
     """
 
 
-@app.get("/auth/google/start")
+@app.get("/auth/google/start", dependencies=[Depends(require_admin)])
 def google_auth_start() -> RedirectResponse:
     state = secrets.token_urlsafe(32)
     store.save_oauth_state(
@@ -145,6 +155,8 @@ def google_auth_callback(
     state: str = Query(...),
     code: str = Query(...),
 ) -> str:
+    # The callback is protected by the high-entropy, single-use OAuth state that
+    # could only be created by the admin-protected start route.
     actor_id = store.consume_oauth_state(state)
     if actor_id is None:
         raise HTTPException(status_code=400, detail="invalid or expired OAuth state")
@@ -175,19 +187,13 @@ def google_auth_callback(
     )
 
 
-@app.post("/scan-now")
-async def scan_now(
-    x_watcher_admin_key: str | None = Header(default=None),
-) -> dict:
-    require_admin(x_watcher_admin_key)
+@app.post("/scan-now", dependencies=[Depends(require_admin)])
+async def scan_now() -> dict:
     return {"results": await scan_all_connections()}
 
 
-@app.get("/status")
-def status(
-    x_watcher_admin_key: str | None = Header(default=None),
-) -> dict:
-    require_admin(x_watcher_admin_key)
+@app.get("/status", dependencies=[Depends(require_admin)])
+def watcher_status() -> dict:
     return {
         "poll_interval_seconds": settings.poll_interval_seconds,
         "connections": store.public_status(),
