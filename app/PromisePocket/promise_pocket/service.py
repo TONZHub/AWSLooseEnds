@@ -1,159 +1,92 @@
-"""Deterministic Promise Pocket capture and attention policy."""
+"""Deterministic preference storage and replacement policy."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
-import re
 
-from .models import (
-    AttentionItem,
-    AttentionReason,
-    Commitment,
-    CommitmentStatus,
-    utc_now,
-)
-from .storage import CommitmentStore
+from .models import Preference, utc_now
+from .storage import PreferenceStore
 
 
-def _has_explicit_clock_time(text: str) -> bool:
-    return bool(
-        re.search(r"\b(?:noon|midnight)\b", text, re.IGNORECASE)
-        or re.search(
-            r"\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b",
-            text,
-            re.IGNORECASE,
-        )
-        or re.search(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b", text)
-        or re.search(r"\bat\s+\d{1,2}(?::\d{2})?\b", text, re.IGNORECASE)
-    )
-
-
-class CommitmentService:
+class PreferenceService:
     def __init__(
         self,
-        store: CommitmentStore,
+        store: PreferenceStore,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self._store = store
         self._clock = clock
 
-    def get(self, *, actor_id: str, commitment_id: str) -> Commitment | None:
-        return self._store.get(actor_id, commitment_id)
+    def get(self, *, actor_id: str, preference_id: str) -> Preference | None:
+        return self._store.get(actor_id, preference_id)
 
     def capture(
         self,
         *,
         actor_id: str,
-        summary: str,
+        preference_key: str,
+        category: str,
+        statement: str,
         raw_text: str,
-        due_at: datetime | None,
-        people: list[str],
-        human_action_required: bool,
-        missing_information: list[str],
-    ) -> Commitment:
+        tags: list[str],
+        source: str = "chat",
+    ) -> Preference:
+        """Create or replace an explicit preference with the same stable key."""
+
         now = self._clock()
-        questions = list(missing_information)
-        if due_at is not None and not _has_explicit_clock_time(raw_text):
-            due_at = None
-            if not questions:
-                questions.append("What time should I bring this back?")
-        commitment = Commitment(
+        normalized_key = preference_key.strip().casefold().replace(" ", "-")
+
+        existing = next(
+            (
+                item
+                for item in self._store.list_for_actor(actor_id)
+                if item.active and item.preference_key == normalized_key
+            ),
+            None,
+        )
+
+        if existing is not None:
+            updated = existing.model_copy(
+                update={
+                    "category": category,
+                    "statement": statement,
+                    "raw_text": raw_text,
+                    "tags": tags,
+                    "source": source,
+                    "active": True,
+                    "updated_at": now,
+                }
+            )
+            self._store.save(updated)
+            return updated
+
+        preference = Preference(
             actor_id=actor_id,
-            summary=summary,
+            preference_key=normalized_key,
+            category=category,
+            statement=statement,
             raw_text=raw_text,
-            due_at=due_at,
-            people=people,
-            human_action_required=human_action_required,
-            missing_information=questions,
+            tags=tags,
+            source=source,
             created_at=now,
             updated_at=now,
         )
-        self._store.save(commitment)
-        return commitment
+        self._store.save(preference)
+        return preference
 
-    def clarify_time(
-        self,
-        *,
-        actor_id: str,
-        commitment_id: str,
-        answer: str,
-        due_at: datetime,
-    ) -> Commitment:
-        commitment = self._store.get(actor_id, commitment_id)
-        if commitment is None:
-            raise ValueError("commitment was not found for this actor")
-        if not _has_explicit_clock_time(answer):
-            raise ValueError("the clarification must contain an explicit clock time")
-        remaining = [
-            question
-            for question in commitment.missing_information
-            if "time" not in question.casefold()
-        ]
-        updated = commitment.model_copy(
-            update={
-                "due_at": due_at,
-                "missing_information": remaining,
-                "updated_at": self._clock(),
-            }
+    def list_preferences(self, *, actor_id: str) -> list[Preference]:
+        return sorted(
+            [item for item in self._store.list_for_actor(actor_id) if item.active],
+            key=lambda item: (item.category.casefold(), item.preference_key),
+        )
+
+    def forget(self, *, actor_id: str, preference_id: str) -> Preference:
+        preference = self._store.get(actor_id, preference_id)
+        if preference is None:
+            raise ValueError("preference was not found for this actor")
+        updated = preference.model_copy(
+            update={"active": False, "updated_at": self._clock()}
         )
         self._store.save(updated)
         return updated
-
-    def review(self, *, actor_id: str, now: datetime | None = None) -> list[AttentionItem]:
-        review_time = now or self._clock()
-        if review_time.tzinfo is None:
-            raise ValueError("review time must include a UTC offset")
-
-        attention: list[AttentionItem] = []
-        for commitment in self._store.list_for_actor(actor_id):
-            if commitment.status is not CommitmentStatus.PENDING:
-                continue
-
-            if commitment.missing_information:
-                attention.append(
-                    AttentionItem(
-                        commitment_id=commitment.commitment_id,
-                        summary=commitment.summary,
-                        reason=AttentionReason.CLARIFICATION,
-                        prompt=commitment.missing_information[0],
-                        due_at=commitment.due_at,
-                    )
-                )
-                continue
-
-            if commitment.blocked_reason:
-                attention.append(
-                    AttentionItem(
-                        commitment_id=commitment.commitment_id,
-                        summary=commitment.summary,
-                        reason=AttentionReason.BLOCKED,
-                        prompt=commitment.blocked_reason,
-                        due_at=commitment.due_at,
-                    )
-                )
-                continue
-
-            if (
-                commitment.human_action_required
-                and commitment.due_at is not None
-                and commitment.due_at <= review_time
-            ):
-                attention.append(
-                    AttentionItem(
-                        commitment_id=commitment.commitment_id,
-                        summary=commitment.summary,
-                        reason=AttentionReason.DUE,
-                        prompt=f"This needs you now: {commitment.summary}",
-                        due_at=commitment.due_at,
-                    )
-                )
-
-        return sorted(
-            attention,
-            key=lambda item: (
-                item.due_at is None,
-                item.due_at or review_time,
-                item.commitment_id,
-            ),
-        )
