@@ -136,12 +136,18 @@ def home() -> str:
 @app.get("/auth/google/start", dependencies=[Depends(require_admin)])
 def google_auth_start() -> RedirectResponse:
     state = secrets.token_urlsafe(32)
+    code_verifier = secrets.token_urlsafe(64)
     store.save_oauth_state(
         state=state,
         actor_id=settings.demo_actor_id,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+        code_verifier=code_verifier,
     )
-    flow = build_oauth_flow(settings, state=state)
+    flow = build_oauth_flow(
+        settings,
+        state=state,
+        code_verifier=code_verifier,
+    )
     authorization_url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
@@ -157,11 +163,15 @@ def google_auth_callback(
 ) -> str:
     # The callback is protected by the high-entropy, single-use OAuth state that
     # could only be created by the admin-protected start route.
-    actor_id = store.consume_oauth_state(state)
-    if actor_id is None:
+    oauth_context = store.consume_oauth_state(state)
+    if oauth_context is None:
         raise HTTPException(status_code=400, detail="invalid or expired OAuth state")
 
-    flow = build_oauth_flow(settings)
+    flow = build_oauth_flow(
+        settings,
+        state=state,
+        code_verifier=oauth_context.code_verifier,
+    )
     flow.fetch_token(code=code)
     credentials = flow.credentials
     if not credentials.refresh_token:
@@ -173,7 +183,7 @@ def google_auth_callback(
     profile = google_profile(credentials)
     email = str(profile.get("emailAddress") or "unknown")
     store.save_google_connection(
-        actor_id=actor_id,
+        actor_id=oauth_context.actor_id,
         email=email,
         refresh_token=credentials.refresh_token,
         scopes=list(credentials.scopes or GMAIL_SCOPES),
