@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/promise_pocket_icon_actual"
+        android:drawable="@drawable/receipts_flash_icon"
         android:gravity="center" />
 </layer-list>
