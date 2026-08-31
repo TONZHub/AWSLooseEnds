@@ -152,6 +152,30 @@ def home() -> str:
       <h1>Pocket Promise Watcher</h1>
       <p>The watcher is alive.</p>
       <p><a href="/auth/google/start">Connect the demo Gmail account</a> (admin protected)</p>
+      <p><a href="/alexa/pair">Generate an Alexa linking code</a> (admin protected)</p>
+    </body></html>
+    """
+
+
+@app.get("/alexa/pair", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
+def alexa_pair() -> str:
+    result = agentcore.create_alexa_pairing(actor_id=settings.demo_actor_id)
+    code = result.get("code")
+    expires_at = result.get("expires_at")
+    if not isinstance(code, str) or len(code) != 6 or not code.isdigit():
+        raise HTTPException(status_code=502, detail="AgentCore returned an invalid pairing code")
+    if not isinstance(expires_at, str) or not expires_at:
+        raise HTTPException(status_code=502, detail="AgentCore returned an invalid expiry")
+
+    return f"""
+    <html><body style="font-family: sans-serif; max-width: 720px; margin: 3rem auto; line-height: 1.5;">
+      <h1>Link Alexa to Promise Pocket</h1>
+      <p>Say:</p>
+      <p style="font-size: 1.2rem;"><strong>Alexa, tell Promise Pocket to link code {code}.</strong></p>
+      <p style="font-size: 3rem; letter-spacing: .35rem; margin: 1rem 0;"><strong>{code}</strong></p>
+      <p>This code is single-use and expires at <code>{expires_at}</code>.</p>
+      <p>After Alexa says the pocket is connected, promises captured on that Alexa will resolve to this demo ledger.</p>
+      <p><a href="/alexa/pair">Make a new code</a></p>
     </body></html>
     """
 
