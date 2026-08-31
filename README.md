@@ -64,7 +64,7 @@ The watcher can generate a single-use pairing code for its configured demo
 ledger:
 
 1. Open the admin-protected watcher route `/alexa/pair`.
-2. Say `Alexa, tell Receipts to link code 482731`, replacing the example
+2. Say `Alexa, tell my receipts to link code 482731`, replacing the example
    with the displayed six digits.
 3. Alexa claims the code through AgentCore and binds its pseudonymous skill user
    identity to that ledger.

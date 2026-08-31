@@ -59,11 +59,11 @@ class AlexaAdapterTests(unittest.TestCase):
             os.path.dirname(os.path.dirname(__file__)), "interaction-model.json"
         )
         with open(model_path, encoding="utf-8") as model_file:
+            language_model = json.load(model_file)["interactionModel"]["languageModel"]
+            self.assertEqual("my receipts", language_model["invocationName"])
             intents = {
                 intent["name"]: set(intent.get("samples", []))
-                for intent in json.load(model_file)["interactionModel"]["languageModel"][
-                    "intents"
-                ]
+                for intent in language_model["intents"]
             }
 
         expected = {

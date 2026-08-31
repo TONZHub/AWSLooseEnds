@@ -4,6 +4,8 @@ from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+import hashlib
+import secrets
 import sqlite3
 
 from cryptography.fernet import Fernet
@@ -74,6 +76,17 @@ class ConnectionStore:
                     reference_id TEXT NOT NULL,
                     sent_at TEXT NOT NULL,
                     PRIMARY KEY(actor_id, commitment_id)
+                )
+                """
+            )
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS mobile_sessions (
+                    token_hash TEXT PRIMARY KEY,
+                    installation_hash TEXT NOT NULL UNIQUE,
+                    actor_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 )
                 """
             )
@@ -217,6 +230,38 @@ class ConnectionStore:
             }
             for row in rows
         ]
+
+    def issue_mobile_session(self, *, installation_id: str, actor_id: str) -> str:
+        token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        installation_hash = hashlib.sha256(installation_id.encode()).hexdigest()
+        now = datetime.now(timezone.utc).isoformat()
+        with closing(self._connect()) as db, db:
+            db.execute(
+                "DELETE FROM mobile_sessions WHERE installation_hash = ?",
+                (installation_hash,),
+            )
+            db.execute(
+                """INSERT INTO mobile_sessions(
+                    token_hash, installation_hash, actor_id, created_at, updated_at
+                ) VALUES(?, ?, ?, ?, ?)""",
+                (token_hash, installation_hash, actor_id, now, now),
+            )
+        return token
+
+    def mobile_actor_for_token(self, token: str) -> str | None:
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        with closing(self._connect()) as db, db:
+            row = db.execute(
+                "SELECT actor_id FROM mobile_sessions WHERE token_hash = ?",
+                (token_hash,),
+            ).fetchone()
+            if row is not None:
+                db.execute(
+                    "UPDATE mobile_sessions SET updated_at = ? WHERE token_hash = ?",
+                    (datetime.now(timezone.utc).isoformat(), token_hash),
+                )
+        return str(row["actor_id"]) if row is not None else None
 
     def _decode_connection(self, row: sqlite3.Row) -> GoogleConnection:
         decrypted = self._fernet.decrypt(row["refresh_token"]).decode("utf-8")

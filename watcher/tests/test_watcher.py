@@ -85,6 +85,16 @@ class ConnectionStoreTests(unittest.TestCase):
             [nudges[1]], self.store.pending_nudges(actor_id="zoe", nudges=nudges)
         )
 
+    def test_mobile_session_token_is_hashed_and_resolves_actor(self):
+        token = self.store.issue_mobile_session(
+            installation_id="installation-1234567890",
+            actor_id="mobile-demo",
+        )
+
+        self.assertEqual("mobile-demo", self.store.mobile_actor_for_token(token))
+        self.assertIsNone(self.store.mobile_actor_for_token("wrong-token"))
+        self.assertNotIn(token.encode(), self.path.read_bytes())
+
     def test_oauth_state_is_one_time_and_preserves_pkce_verifier(self):
         self.store.save_oauth_state(
             state="good-state",
@@ -166,6 +176,29 @@ class AgentCoreClientTests(unittest.TestCase):
             json.loads(request["payload"]),
         )
         self.assertNotIn("notification", request)
+
+    @patch("agentcore_client.boto3.client")
+    def test_mobile_pair_claim_binds_runtime_identity(self, build_client):
+        runtime = build_client.return_value
+        runtime.invoke_agent_runtime.return_value = {
+            "statusCode": 200,
+            "response": io.BytesIO(
+                json.dumps({"operation": "pair_claim", "linked": True}).encode()
+            ),
+        }
+        client = PocketPromiseAgentCoreClient(
+            SimpleNamespace(aws_region="us-east-1", agent_runtime_arn="arn:example")
+        )
+
+        result = client.claim_pairing(actor_id="mobile-demo", code="123456")
+
+        self.assertTrue(result["linked"])
+        request = runtime.invoke_agent_runtime.call_args.kwargs
+        self.assertEqual("mobile-demo", request["runtimeUserId"])
+        self.assertEqual(
+            {"operation": "pair_claim", "actor_id": "mobile-demo", "code": "123456"},
+            json.loads(request["payload"]),
+        )
 
 
 class AlexaProactiveClientTests(unittest.TestCase):

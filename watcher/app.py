@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+import hashlib
 import logging
 from pathlib import Path
 import secrets
@@ -10,7 +11,13 @@ from secrets import compare_digest
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBasic,
+    HTTPBasicCredentials,
+    HTTPBearer,
+)
+from pydantic import BaseModel, Field
 
 from agentcore_client import PocketPromiseAgentCoreClient
 from alexa_proactive import AlexaProactiveClient
@@ -41,7 +48,29 @@ alexa_proactive = (
     else None
 )
 security = HTTPBasic()
+mobile_security = HTTPBearer(auto_error=False)
 FAVICON_PATH = Path(__file__).with_name("favicon.png")
+
+
+class MobileLinkRequest(BaseModel):
+    code: str = Field(pattern=r"^\d{6}$")
+    installation_id: str = Field(min_length=16, max_length=200)
+
+
+class MobileCaptureRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+    source_id: str = Field(min_length=8, max_length=200)
+
+
+def require_mobile_actor(
+    credentials: HTTPAuthorizationCredentials | None = Depends(mobile_security),
+) -> str:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(status_code=401, detail="mobile link required")
+    actor_id = store.mobile_actor_for_token(credentials.credentials)
+    if actor_id is None:
+        raise HTTPException(status_code=401, detail="mobile link expired")
+    return actor_id
 
 
 async def scan_connection(connection: GoogleConnection) -> dict:
@@ -263,6 +292,7 @@ def home() -> str:
           <nav class="actions" aria-label="Receipts actions">
             <a class="action" href="/auth/google/start"><strong>Connect Gmail</strong><small>Watch authorized sent mail for commitments and evidence of follow-through.</small></a>
             <a class="action" href="/alexa/pair"><strong>Pair Alexa</strong><small>Generate a short-lived code. No Login with Amazon required.</small></a>
+            <a class="action" href="/mobile/pair"><strong>Pair Android</strong><small>Issue a one-time code that connects the phone to this evidence ledger.</small></a>
             <a class="action" href="/status"><strong>Watcher status</strong><small>Inspect connected sources and the last completed scan.</small></a>
           </nav>
         """,
@@ -285,7 +315,7 @@ def alexa_pair() -> str:
           <p class="lede">Read this one-time evidence code to Alexa:</p>
           <div class="code"><span class="stamp">pairing exhibit</span><strong>{code}</strong></div>
           <section class="evidence"><div class="stamp">statement</div>
-          <p>“Alexa, tell Receipts to link code {code}.”</p></section>
+          <p>“Alexa, tell my receipts to link code {code}.”</p></section>
           <p class="meta">Single-use. Expires at {expires_at}. After Alexa confirms the connection,
           anything captured through this Alexa identity resolves to the selected ledger.</p>
           <nav class="actions" aria-label="Pairing actions">
@@ -293,6 +323,70 @@ def alexa_pair() -> str:
             <a class="action" href="/"><strong>Return to the ledger</strong><small>Back to source connections and watcher status.</small></a>
           </nav>
         """,
+    )
+
+
+@app.get("/mobile/pair", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
+def mobile_pair() -> str:
+    result = agentcore.create_alexa_pairing(actor_id=settings.demo_actor_id)
+    code = result.get("code")
+    expires_at = result.get("expires_at")
+    if not isinstance(code, str) or len(code) != 6 or not code.isdigit():
+        raise HTTPException(status_code=502, detail="AgentCore returned an invalid pairing code")
+    return receipts_page(
+        title="Pair Android",
+        body=f"""
+          <p class="lede">Enter this one-time evidence code in the Receipts app:</p>
+          <div class="code"><span class="stamp">mobile pairing exhibit</span><strong>{code}</strong></div>
+          <section class="evidence"><p>The code expires at {expires_at}. The phone receives a revocable token; the raw pairing code is never stored.</p></section>
+          <nav class="actions"><a class="action" href="/mobile/pair"><strong>Issue another code</strong><small>Create a fresh ten-minute mobile pairing exhibit.</small></a></nav>
+        """,
+    )
+
+
+@app.post("/api/mobile/v1/link")
+def mobile_link(payload: MobileLinkRequest) -> dict:
+    installation_hash = hashlib.sha256(payload.installation_id.encode()).hexdigest()
+    actor_id = f"mobile-{installation_hash}"
+    result = agentcore.claim_pairing(actor_id=actor_id, code=payload.code)
+    if result.get("linked") is not True:
+        raise HTTPException(status_code=400, detail="invalid or expired pairing code")
+    token = store.issue_mobile_session(
+        installation_id=payload.installation_id,
+        actor_id=actor_id,
+    )
+    return {"linked": True, "token": token, "actor_id": actor_id}
+
+
+@app.get("/api/mobile/v1/commitments")
+def mobile_commitments(actor_id: str = Depends(require_mobile_actor)) -> dict:
+    return agentcore.list_commitments(actor_id=actor_id)
+
+
+@app.post("/api/mobile/v1/capture")
+def mobile_capture(
+    payload: MobileCaptureRequest,
+    actor_id: str = Depends(require_mobile_actor),
+) -> dict:
+    return agentcore.capture_mobile_message(
+        actor_id=actor_id,
+        source_id=payload.source_id,
+        text=payload.text,
+    )
+
+
+@app.post("/api/mobile/v1/commitments/{commitment_id}/{action}")
+def mobile_transition(
+    commitment_id: str,
+    action: str,
+    actor_id: str = Depends(require_mobile_actor),
+) -> dict:
+    if action not in {"confirm", "done", "reopen", "cancel"}:
+        raise HTTPException(status_code=404, detail="unsupported commitment action")
+    return agentcore.transition_commitment(
+        actor_id=actor_id,
+        commitment_id=commitment_id,
+        action=action,
     )
 
 
