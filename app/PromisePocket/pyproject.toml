@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aws-promise-pocket"
 version = "0.1.0"
-description = "Promise Pocket: a quiet memory for promises, built with Strands and Amazon Bedrock AgentCore."
+description = "Receipts: a quiet memory for promises, built with Strands and Amazon Bedrock AgentCore."
 requires-python = ">=3.12"
 dependencies = [
   "aws-opentelemetry-distro",

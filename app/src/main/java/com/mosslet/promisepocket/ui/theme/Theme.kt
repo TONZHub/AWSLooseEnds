@@ -18,7 +18,7 @@ import androidx.core.view.WindowCompat
 
 private val LightColorScheme = lightColorScheme(
     primary = PromiseBerry,
-    onPrimary = Color.White,
+    onPrimary = PromiseCream,
     primaryContainer = PromiseBlush,
     onPrimaryContainer = PromiseBerry,
     secondary = PromiseMauve,
@@ -29,37 +29,37 @@ private val LightColorScheme = lightColorScheme(
     onTertiary = Slate900,
     tertiaryContainer = PromisePeach,
     onTertiaryContainer = Slate900,
-    background = Slate50,
-    onBackground = Slate900,
-    surface = Color.White,
+    background = Slate900,
+    onBackground = PromiseCream,
+    surface = Slate50,
     onSurface = Slate900,
-    surfaceVariant = Color(0xFFF7ECEF),
+    surfaceVariant = Slate100,
     onSurfaceVariant = Slate600,
-    outline = Color(0xFFD8C8CE),
-    outlineVariant = Color(0xFFECE2E5)
+    outline = Slate700,
+    outlineVariant = Slate200
 )
 
 private val DarkColorScheme = darkColorScheme(
     primary = PromisePink,
     onPrimary = Slate900,
-    primaryContainer = Color(0xFF3A2230),
+    primaryContainer = PromisePinkDark,
     onPrimaryContainer = PromiseBlush,
     secondary = PromisePeach,
     onSecondary = Slate900,
-    secondaryContainer = Color(0xFF49323B),
+    secondaryContainer = Slate700,
     onSecondaryContainer = PromiseCream,
     tertiary = PromiseBlush,
     onTertiary = Slate900,
     tertiaryContainer = PromiseBerry,
     onTertiaryContainer = PromiseCream,
     background = Slate900,
-    onBackground = Color(0xFFF7F2F4),
-    surface = Slate800,
-    onSurface = Color(0xFFF8F3F5),
-    surfaceVariant = Slate700,
-    onSurfaceVariant = Color(0xFFD9CDD2),
-    outline = Color(0xFF6F5C67),
-    outlineVariant = Color(0xFF3C4658)
+    onBackground = PromiseCream,
+    surface = Slate50,
+    onSurface = Slate900,
+    surfaceVariant = Slate100,
+    onSurfaceVariant = Slate600,
+    outline = Slate700,
+    outlineVariant = Slate200
 )
 
 @Composable

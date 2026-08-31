@@ -3,7 +3,7 @@ package com.mosslet.promisepocket.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -54,18 +53,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mosslet.promisepocket.R
 import com.mosslet.promisepocket.data.model.CommitmentStatus
 import com.mosslet.promisepocket.ui.components.AttentionSection
 import com.mosslet.promisepocket.ui.components.ClarificationDialog
@@ -73,8 +67,10 @@ import com.mosslet.promisepocket.ui.components.CommitmentCard
 import com.mosslet.promisepocket.ui.components.CommitmentDetailDialog
 import com.mosslet.promisepocket.ui.components.QuickCaptureBar
 import com.mosslet.promisepocket.ui.theme.PromiseCream
+import com.mosslet.promisepocket.ui.theme.PromisePeach
 import com.mosslet.promisepocket.ui.theme.PromisePink
 import com.mosslet.promisepocket.ui.theme.Slate400
+import com.mosslet.promisepocket.ui.theme.Slate600
 import com.mosslet.promisepocket.ui.theme.Slate700
 import com.mosslet.promisepocket.ui.theme.Slate900
 import com.mosslet.promisepocket.ui.viewmodel.FilterTab
@@ -104,23 +100,19 @@ fun MainScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Image(
-                            painter = painterResource(id = R.drawable.promise_pocket_icon_actual),
-                            contentDescription = "Promise Pocket Logo",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                        )
+                        Surface(color = PromisePink, shape = RoundedCornerShape(0.dp)) {
+                            Text("R", modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                color = PromiseCream, fontWeight = FontWeight.Black, fontSize = 22.sp)
+                        }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Promise Pocket",
+                                text = "Receipts",
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Exact ledger of obligations",
+                                text = "WE HAVE THE RECEIPTS",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = PromisePink.copy(alpha = 0.86f)
                             )
@@ -286,59 +278,48 @@ fun MainScreen(
 @Composable
 private fun HeroBannerCard() {
     Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = Slate900,
+        shape = RoundedCornerShape(2.dp),
+        color = PromiseCream,
+        border = BorderStroke(2.dp, Slate900),
+        shadowElevation = 10.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(130.dp)
+                .padding(horizontal = 18.dp, vertical = 22.dp)
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.promise_pocket_hero_1788013716030),
-                contentDescription = "Quiet Pocket Desk",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(20.dp))
-            )
+            Text("●  THE WATCHER IS ALIVE", color = PromisePink,
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.4.sp, fontWeight = FontWeight.Bold))
+            Spacer(modifier = Modifier.height(14.dp))
+            ReceiptsWordmark()
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Every promise captured becomes EVIDENCE.",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = Slate900)
+            Spacer(modifier = Modifier.height(5.dp))
+            Text("Every deadline—recorded. The ledger does not sleep.",
+                style = MaterialTheme.typography.bodyMedium, color = Slate600)
+        }
+    }
+}
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                Slate900.copy(alpha = 0.90f),
-                                Slate900.copy(alpha = 0.60f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.Center
+@Composable
+private fun ReceiptsWordmark() {
+    val cuts = listOf("R", "e", "C", "i", "E", "PT", "S")
+    val colors = listOf(PromisePeach, PromiseCream, PromisePink, Slate900, PromiseCream, Slate900, PromiseCream)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        cuts.forEachIndexed { index, cut ->
+            Surface(
+                color = colors[index],
+                border = BorderStroke(1.dp, Slate900),
+                shape = RoundedCornerShape(0.dp),
+                shadowElevation = 3.dp,
+                modifier = Modifier.rotate(if (index % 2 == 0) -3f else 3f)
             ) {
-                Text(
-                    text = "A quiet place for what you mean to do.",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Captures ordinary commitments. Interrupts only when truly needed.",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = PromiseCream,
-                        fontSize = 13.sp
-                    )
-                )
+                Text(cut, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                    color = if (colors[index] == Slate900 || colors[index] == PromisePink) PromiseCream else Slate900,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                    fontWeight = FontWeight.Black, fontSize = if (cut.length > 1) 20.sp else 27.sp)
             }
         }
     }

@@ -1,4 +1,4 @@
-"""Thin Alexa Custom Skill adapter for the Promise Pocket AgentCore runtime."""
+"""Thin Alexa Custom Skill adapter for the Receipts AgentCore runtime."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def _speech(
 def _first_turn(event: dict[str, Any], text: str) -> str:
     """Identify the skill when Alexa routes directly into a new session."""
     if event.get("session", {}).get("new") is True:
-        return f"Promise Pocket here. {text}"
+        return f"Receipts here. {text}"
     return text
 
 
@@ -176,7 +176,7 @@ def _pair(event: dict[str, Any], intent: dict[str, Any]):
         return _speech(
             _first_turn(event, "What's the six digit linking code?"),
             end_session=False,
-            reprompt="Say the six digit code from Promise Pocket.",
+            reprompt="Say the six digit code from Receipts.",
         )
 
     digits = "".join(character for character in code if character.isdigit())
@@ -184,7 +184,7 @@ def _pair(event: dict[str, Any], intent: dict[str, Any]):
         return _speech(
             _first_turn(event, "That linking code should be six digits. Try it again."),
             end_session=False,
-            reprompt="Say the six digit code from Promise Pocket.",
+            reprompt="Say the six digit code from Receipts.",
         )
 
     result = _invoke(event, {"operation": "pair_claim", "code": digits})
@@ -239,7 +239,7 @@ def _answer_review(event: dict[str, Any], *, accepted: bool):
         or review_kind not in REVIEW_KINDS
     ):
         return _speech(
-            "Ask me to review your Promise Pocket first, so I know which promise you mean."
+            "Ask me to review your receipts first, so I know which promise you mean."
         )
 
     if review_kind == REVIEW_CONFIRM_CANDIDATE:
@@ -331,7 +331,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         request_type = request.get("type")
         if request_type == "LaunchRequest":
             return _speech(
-                "Promise Pocket is listening. What should I hold onto?",
+                "Receipts is listening. What should I hold onto?",
                 end_session=False,
                 reprompt="Tell me a promise or task to remember.",
             )
@@ -358,7 +358,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return _speech(
                 _first_turn(
                     event,
-                    "Try saying, link code 4 8 2 7 3 1, review my Promise Pocket, or, I promised to call Mom tomorrow at noon.",
+                    "Try saying, link code 4 8 2 7 3 1, review my receipts, or, I promised to call Mom tomorrow at noon.",
                 ),
                 end_session=False,
                 reprompt="What should I remember?",
@@ -372,4 +372,4 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         )
     except Exception:
         LOGGER.exception("Alexa request failed")
-        return _speech("Promise Pocket hit a snag. Please try again in a moment.")
+        return _speech("Receipts hit a snag. Please try again in a moment.")

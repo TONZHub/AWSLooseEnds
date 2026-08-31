@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Promise Pocket</string>
+    <string name="app_name">Receipts</string>
     <string name="tagline">A quiet place for the things you mean to do</string>
     <string name="capture_hint">“I promised Mom I’d call the dentist tomorrow at noon”</string>
     <string name="needs_attention_title">Needs Your Attention</string>

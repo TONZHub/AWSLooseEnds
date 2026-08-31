@@ -1,8 +1,8 @@
-# Promise Pocket (Android)
+# Receipts (Android)
 
 **A quiet place for the things you mean to do.**
 
-Promise Pocket captures commitments in ordinary language, keeps an exact local ledger of them in Room, and interrupts only when a person genuinely needs to act, clarify, decide, approve, send, or pay.
+Receipts captures commitments in ordinary language, keeps an exact local ledger of them in Room, and interrupts only when a person genuinely needs to act, clarify, decide, approve, send, or pay.
 
 > “I promised Mom I’d call the dentist tomorrow at noon.”
 
@@ -64,7 +64,7 @@ The watcher can generate a single-use pairing code for its configured demo
 ledger:
 
 1. Open the admin-protected watcher route `/alexa/pair`.
-2. Say `Alexa, tell Promise Pocket to link code 482731`, replacing the example
+2. Say `Alexa, tell Receipts to link code 482731`, replacing the example
    with the displayed six digits.
 3. Alexa claims the code through AgentCore and binds its pseudonymous skill user
    identity to that ledger.
