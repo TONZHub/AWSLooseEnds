@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 from .ledger_v2 import InMemoryPromiseLedgerStore, PromiseLedgerStore, PromiseRecord
@@ -9,6 +10,23 @@ from .settings import Settings
 
 
 RECORD_TYPE = "promise_v2"
+
+
+def _dynamodb_safe(value: Any) -> Any:
+    """Convert JSON-shaped model data into values accepted by boto3 DynamoDB.
+
+    boto3's DynamoDB serializer rejects Python ``float`` values. Pocket Promise
+    uses floats for confidence scores, so convert them to exact decimal strings
+    before writing while preserving the surrounding structure.
+    """
+
+    if isinstance(value, float):
+        return Decimal(str(value))
+    if isinstance(value, dict):
+        return {key: _dynamodb_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_dynamodb_safe(item) for item in value]
+    return value
 
 
 class DynamoDbPromiseLedgerStore(PromiseLedgerStore):
@@ -28,7 +46,7 @@ class DynamoDbPromiseLedgerStore(PromiseLedgerStore):
 
     @staticmethod
     def _to_item(record: PromiseRecord) -> dict[str, Any]:
-        item = record.model_dump(mode="json")
+        item = _dynamodb_safe(record.model_dump(mode="json"))
         item["record_type"] = RECORD_TYPE
         # Preserve the old derived attributes in case the deployed table has
         # indexes or tooling that expects them.

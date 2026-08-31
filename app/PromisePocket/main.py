@@ -14,8 +14,9 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from promise_pocket.agent import build_agent, build_clarification_agent
 from promise_pocket.arbiter_v2 import arbitrate_outgoing_message, build_arbiter_agent
 from promise_pocket.ingest_v2 import SourceMessage
-from promise_pocket.ledger_v2 import PromiseLedger
+from promise_pocket.ledger_v2 import PromiseLedger, PromiseState
 from promise_pocket.ledger_v2_storage import build_ledger_v2_store
+from promise_pocket.reconcile_v2 import build_evidence_agent, reconcile_outgoing_message
 from promise_pocket.service import CommitmentService
 from promise_pocket.settings import Settings
 from promise_pocket.storage import build_store
@@ -58,6 +59,16 @@ def _require_commitment_id(payload: dict[str, Any]) -> str:
     return commitment_id.strip()
 
 
+def _source_message(payload: dict[str, Any], operation: str) -> SourceMessage:
+    raw_message = payload.get("source_message")
+    if not isinstance(raw_message, dict):
+        raise ValueError(f"source_message is required for {operation}")
+    message = SourceMessage.model_validate(raw_message)
+    if message.direction != "sent":
+        raise ValueError(f"{operation} only accepts outgoing source messages")
+    return message
+
+
 def _invoke_v2(
     *,
     operation: str,
@@ -67,13 +78,7 @@ def _invoke_v2(
     """Handle Pocket Promise v2 operations, or return None for legacy routing."""
 
     if operation == "v2_arbitrate":
-        raw_message = payload.get("source_message")
-        if not isinstance(raw_message, dict):
-            raise ValueError("source_message is required for v2_arbitrate")
-        message = SourceMessage.model_validate(raw_message)
-        if message.direction != "sent":
-            raise ValueError("v2_arbitrate only accepts outgoing source messages")
-
+        message = _source_message(payload, operation)
         timezone_name = payload.get("timezone") or settings.timezone_name
         if not isinstance(timezone_name, str) or not timezone_name.strip():
             raise ValueError("timezone must be a non-empty IANA timezone name")
@@ -105,11 +110,63 @@ def _invoke_v2(
             ],
         }
 
+    if operation == "v2_reconcile":
+        message = _source_message(payload, operation)
+        active_promises = [
+            record
+            for record in v2_ledger.list_for_actor(actor_id=actor_id)
+            if record.status in {PromiseState.ACTIVE, PromiseState.OVERDUE}
+        ]
+        if not active_promises:
+            return {
+                "operation": operation,
+                "result": "No active promises to reconcile.",
+                "likely_done_ids": [],
+                "items": [],
+            }
+
+        likely_done_ids: list[str] = []
+        agent = build_evidence_agent(
+            v2_ledger,
+            settings.model_id,
+            on_likely_done=likely_done_ids.append,
+        )
+        result = reconcile_outgoing_message(
+            agent,
+            actor_id=actor_id,
+            message=message,
+            active_promises=active_promises,
+        )
+        items = [
+            v2_ledger.get(actor_id=actor_id, commitment_id=commitment_id)
+            for commitment_id in likely_done_ids
+        ]
+        return {
+            "operation": operation,
+            "result": result,
+            "likely_done_ids": likely_done_ids,
+            "items": [
+                item.model_dump(mode="json")
+                for item in items
+                if item is not None
+            ],
+        }
+
     if operation == "v2_list":
         records = v2_ledger.list_for_actor(actor_id=actor_id)
         return {
             "operation": operation,
             "items": [record.model_dump(mode="json") for record in records],
+        }
+
+    if operation == "v2_overdue":
+        now = _parse_now(payload.get("now"))
+        transitioned = v2_ledger.evaluate_overdue(actor_id=actor_id, now=now)
+        nudges = v2_ledger.prepare_overdue_nudges(actor_id=actor_id, now=now)
+        return {
+            "operation": operation,
+            "overdue_ids": [record.commitment_id for record in transitioned],
+            "nudges": nudges,
         }
 
     if operation == "v2_confirm":

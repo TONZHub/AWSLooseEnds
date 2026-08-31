@@ -17,18 +17,21 @@ class PocketPromiseAgentCoreClient:
             region_name=settings.aws_region,
         )
 
-    def arbitrate_message(
+    def _invoke_source_operation(
         self,
         *,
+        operation: str,
         actor_id: str,
         source_message: dict[str, Any],
     ) -> dict[str, Any]:
         source_id = str(source_message.get("source_id") or "unknown")
-        session_id = "watcher-session-" + hashlib.sha256(
-            f"{actor_id}:{source_id}".encode("utf-8")
+        digest = hashlib.sha256(
+            f"{operation}:{actor_id}:{source_id}".encode("utf-8")
         ).hexdigest()
+        safe_operation = operation.replace("_", "-")
+        session_id = f"watcher-{safe_operation}-{digest}"
         payload = {
-            "operation": "v2_arbitrate",
+            "operation": operation,
             "actor_id": actor_id,
             "source_message": source_message,
             "timezone": self._settings.timezone_name,
@@ -46,6 +49,56 @@ class PocketPromiseAgentCoreClient:
             raise RuntimeError(
                 f"AgentCore returned status {response.get('statusCode')}"
             )
+        body = response["response"]
+        raw = body.read() if hasattr(body, "read") else b"".join(body)
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        result = json.loads(raw)
+        if not isinstance(result, dict):
+            raise ValueError("AgentCore returned a non-object response")
+        return result
+
+    def arbitrate_message(
+        self,
+        *,
+        actor_id: str,
+        source_message: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._invoke_source_operation(
+            operation="v2_arbitrate",
+            actor_id=actor_id,
+            source_message=source_message,
+        )
+
+    def reconcile_message(
+        self,
+        *,
+        actor_id: str,
+        source_message: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._invoke_source_operation(
+            operation="v2_reconcile",
+            actor_id=actor_id,
+            source_message=source_message,
+        )
+
+    def prepare_overdue_nudges(self, *, actor_id: str) -> dict[str, Any]:
+        payload = {
+            "operation": "v2_overdue",
+            "actor_id": actor_id,
+        }
+        digest = hashlib.sha256(f"v2_overdue:{actor_id}".encode("utf-8")).hexdigest()
+        response = self._client.invoke_agent_runtime(
+            agentRuntimeArn=self._settings.agent_runtime_arn,
+            qualifier="DEFAULT",
+            runtimeSessionId=f"watcher-v2-overdue-{digest}",
+            runtimeUserId=actor_id,
+            contentType="application/json",
+            accept="application/json",
+            payload=json.dumps(payload).encode("utf-8"),
+        )
+        if response.get("statusCode") != 200:
+            raise RuntimeError(f"AgentCore returned status {response.get('statusCode')}")
         body = response["response"]
         raw = body.read() if hasattr(body, "read") else b"".join(body)
         if isinstance(raw, bytes):

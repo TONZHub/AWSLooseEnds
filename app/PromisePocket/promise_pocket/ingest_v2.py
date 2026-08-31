@@ -10,6 +10,18 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from .ledger_v2 import PromiseLedger, PromiseRecord
 
 
+_GENERIC_PEOPLE = {
+    "user",
+    "the user",
+    "sender",
+    "the sender",
+    "recipient",
+    "the recipient",
+    "me",
+    "you",
+}
+
+
 class SourceMessage(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -60,6 +72,21 @@ class PromiseExtraction(BaseModel):
         return self
 
 
+def _clean_people(values: list[str]) -> list[str]:
+    """Keep explicit people/addresses while dropping model-invented role labels."""
+
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        normalized = value.strip()
+        key = normalized.casefold()
+        if not normalized or key in _GENERIC_PEOPLE or key in seen:
+            continue
+        seen.add(key)
+        result.append(normalized)
+    return result
+
+
 class CandidateIngestor:
     """Apply model judgments without letting the model bypass user consent."""
 
@@ -93,7 +120,7 @@ class CandidateIngestor:
             confidence=extraction.confidence,
             source=message.source,
             source_id=message.source_id,
-            people=extraction.people,
+            people=_clean_people(extraction.people),
             due_at=extraction.due_at,
             evidence_hint=extraction.evidence_hint,
         )

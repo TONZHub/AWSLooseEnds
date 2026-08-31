@@ -7,13 +7,13 @@ It never confirms, completes, cancels, or otherwise mutates commitment state.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
 from typing import Any
 
 from strands import Agent, ToolContext, tool
 
 from .ingest_v2 import CandidateIngestor, PromiseExtraction, SourceMessage
 from .ledger_v2 import PromiseLedger
+from .time_resolution import resolve_due_at
 
 
 ARBITER_PROMPT = """
@@ -37,9 +37,11 @@ When you do call the tool:
 - deliverable must be a short faithful description of what the user undertook;
 - supporting_text must be an exact excerpt from the user's message that proves
   the commitment, not a paraphrase;
-- people may include only people explicitly involved in the message;
-- never invent a deadline. due_at must be null unless the message provides enough
-  timing information to resolve it from the supplied message timestamp/timezone;
+- people may include only explicitly named people or exact addresses present in
+  the message. Never emit generic labels such as user, sender, recipient, me, or you;
+- do not calculate, normalize, or invent a deadline yourself;
+- time_phrase must be the exact timing words from the user's message, such as
+  "tomorrow by 3 PM" or "Tuesday at noon". Use null when no timing words exist;
 - confidence measures confidence that a genuine user-owned commitment exists;
 - evidence_hint should briefly describe what later digital evidence might suggest
   fulfillment, without claiming that fulfillment has happened;
@@ -48,15 +50,6 @@ When you do call the tool:
 If there is no commitment, do not call the tool. Respond briefly that no candidate
 was proposed. A model judgment is never user confirmation.
 """.strip()
-
-
-def _parse_optional_datetime(value: str | None) -> datetime | None:
-    if value is None:
-        return None
-    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if parsed.tzinfo is None:
-        raise ValueError("due_at must include a UTC offset")
-    return parsed
 
 
 def make_candidate_tool(
@@ -70,7 +63,7 @@ def make_candidate_tool(
         confidence: float,
         reason: str,
         tool_context: ToolContext,
-        due_at: str | None = None,
+        time_phrase: str | None = None,
         people: list[str] | None = None,
         evidence_hint: str | None = None,
     ) -> dict[str, Any]:
@@ -81,23 +74,30 @@ def make_candidate_tool(
             supporting_text: Exact source excerpt proving the commitment.
             confidence: Confidence from 0.0 to 1.0 that this is a commitment.
             reason: Brief explanation for the judgment.
-            due_at: Resolved ISO-8601 deadline with UTC offset, or null.
-            people: People explicitly involved in the commitment.
+            time_phrase: Exact timing words from the source message, or null.
+            people: Explicitly named people or addresses involved in the commitment.
             evidence_hint: Later evidence that might suggest fulfillment.
             tool_context: Strands invocation context; supplied by the framework.
         """
 
         actor_id = tool_context.invocation_state.get("actor_id")
         raw_message = tool_context.invocation_state.get("source_message")
+        timezone_name = tool_context.invocation_state.get("timezone_name")
         if not isinstance(actor_id, str) or not actor_id:
             raise ValueError("trusted actor_id is missing from invocation state")
+        if not isinstance(timezone_name, str) or not timezone_name:
+            raise ValueError("trusted timezone_name is missing from invocation state")
         message = SourceMessage.model_validate(raw_message)
 
         extraction = PromiseExtraction(
             is_commitment=True,
             deliverable=deliverable,
             people=people or [],
-            due_at=_parse_optional_datetime(due_at),
+            due_at=resolve_due_at(
+                time_phrase=time_phrase,
+                occurred_at=message.occurred_at,
+                timezone_name=timezone_name,
+            ),
             confidence=confidence,
             supporting_text=supporting_text,
             evidence_hint=evidence_hint,
@@ -158,5 +158,6 @@ def arbitrate_outgoing_message(
         f"Body:\n{message.body}",
         actor_id=actor_id,
         source_message=message.model_dump(mode="json"),
+        timezone_name=timezone_name,
     )
     return result.message

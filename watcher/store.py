@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,7 +37,7 @@ class ConnectionStore:
         return connection
 
     def _initialize(self) -> None:
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             db.execute(
                 """
                 CREATE TABLE IF NOT EXISTS google_connections (
@@ -74,7 +75,7 @@ class ConnectionStore:
         expires_at: datetime,
         code_verifier: str,
     ) -> None:
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             db.execute(
                 """
                 INSERT OR REPLACE INTO oauth_states(
@@ -86,7 +87,7 @@ class ConnectionStore:
 
     def consume_oauth_state(self, state: str) -> OAuthStateContext | None:
         now = datetime.now(timezone.utc)
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             row = db.execute(
                 """
                 SELECT actor_id, expires_at, code_verifier
@@ -119,7 +120,7 @@ class ConnectionStore:
     ) -> None:
         now = datetime.now(timezone.utc).isoformat()
         encrypted = self._fernet.encrypt(refresh_token.encode("utf-8"))
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             db.execute(
                 """
                 INSERT INTO google_connections(
@@ -137,21 +138,21 @@ class ConnectionStore:
             )
 
     def list_google_connections(self) -> list[GoogleConnection]:
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             rows = db.execute(
                 "SELECT actor_id, email, refresh_token, scopes, last_checked_at FROM google_connections"
             ).fetchall()
         return [self._decode_connection(row) for row in rows]
 
     def update_last_checked(self, *, actor_id: str, checked_at: datetime) -> None:
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             db.execute(
                 "UPDATE google_connections SET last_checked_at = ?, updated_at = ? WHERE actor_id = ?",
                 (checked_at.isoformat(), datetime.now(timezone.utc).isoformat(), actor_id),
             )
 
     def public_status(self) -> list[dict[str, str | None]]:
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             rows = db.execute(
                 "SELECT actor_id, email, last_checked_at FROM google_connections ORDER BY email"
             ).fetchall()

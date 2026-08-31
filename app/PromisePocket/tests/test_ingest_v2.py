@@ -114,6 +114,17 @@ class CandidateIngestorTests(unittest.TestCase):
         self.assertEqual("I'll send the final mockups Tuesday.", record.raw_text)
         self.assertNotIn("Private preamble", record.raw_text)
 
+    def test_generic_people_labels_are_filtered(self):
+        record = self.ingestor.apply(
+            actor_id="zoe",
+            message=self.message(source_id="gmail-msg-roles"),
+            extraction=self.extraction(
+                people=["User", "recipient", "Jordan", "the sender", "Jordan"]
+            ),
+        )
+
+        self.assertEqual(["Jordan"], record.people)
+
 
 if __name__ == "__main__":
     unittest.main()

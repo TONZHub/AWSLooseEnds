@@ -35,6 +35,7 @@ class PromiseEvidence(BaseModel):
     source: str = Field(min_length=1, max_length=80)
     source_id: str | None = Field(default=None, max_length=512)
     summary: str = Field(min_length=1, max_length=1000)
+    supporting_text: str | None = Field(default=None, max_length=2000)
     confidence: float = Field(ge=0.0, le=1.0)
     observed_at: datetime = Field(default_factory=utc_now)
 
@@ -199,6 +200,59 @@ class PromiseLedger:
                 f"cannot mark overdue from state {record.status.value}"
             )
         return self._save(record, status=PromiseState.OVERDUE, updated_at=self._clock())
+
+    def evaluate_overdue(
+        self,
+        *,
+        actor_id: str,
+        now: datetime | None = None,
+    ) -> list[PromiseRecord]:
+        """Move due, unresolved ACTIVE promises to OVERDUE.
+
+        A deadline is considered passed only when ``now`` is strictly later
+        than ``due_at``. Repeated evaluations are idempotent because only
+        ACTIVE records are eligible for the transition.
+        """
+
+        evaluated_at = now or self._clock()
+        if evaluated_at.tzinfo is None:
+            raise ValueError("now must include a UTC offset")
+
+        transitioned: list[PromiseRecord] = []
+        for record in self._store.list_for_actor(actor_id):
+            if (
+                record.status is PromiseState.ACTIVE
+                and record.due_at is not None
+                and evaluated_at > record.due_at
+            ):
+                transitioned.append(
+                    self._save(
+                        record,
+                        status=PromiseState.OVERDUE,
+                        updated_at=evaluated_at,
+                    )
+                )
+        return transitioned
+
+    def prepare_overdue_nudges(
+        self,
+        *,
+        actor_id: str,
+        now: datetime | None = None,
+    ) -> list[dict[str, str]]:
+        """Prepare, but do not send, nudges for unresolved overdue promises."""
+
+        self.evaluate_overdue(actor_id=actor_id, now=now)
+        return [
+            {
+                "commitment_id": record.commitment_id,
+                "deliverable": record.deliverable,
+                "due_at": record.due_at.isoformat(),
+                "message": f"Still unresolved: {record.deliverable}",
+            }
+            for record in self._store.list_for_actor(actor_id)
+            if record.status is PromiseState.OVERDUE and record.due_at is not None
+        ]
 
     def mark_likely_done(
         self,

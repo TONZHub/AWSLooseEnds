@@ -165,6 +165,70 @@ class PromiseLedgerV2Tests(unittest.TestCase):
                 due_at=datetime(2026, 9, 1, 18, 0),
             )
 
+    def test_active_promise_becomes_overdue_only_after_due_time(self):
+        record = self.candidate(due_at=NOW)
+        self.ledger.confirm(actor_id="zoe", commitment_id=record.commitment_id)
+
+        self.assertEqual([], self.ledger.evaluate_overdue(actor_id="zoe", now=NOW))
+        transitioned = self.ledger.evaluate_overdue(
+            actor_id="zoe", now=NOW + timedelta(microseconds=1)
+        )
+
+        self.assertEqual([record.commitment_id], [item.commitment_id for item in transitioned])
+        self.assertEqual(PromiseState.OVERDUE, transitioned[0].status)
+
+    def test_overdue_comparison_respects_timezone_offsets(self):
+        eastern = timezone(timedelta(hours=-4))
+        record = self.candidate(due_at=datetime(2026, 8, 30, 13, 0, tzinfo=eastern))
+        self.ledger.confirm(actor_id="zoe", commitment_id=record.commitment_id)
+
+        transitioned = self.ledger.evaluate_overdue(
+            actor_id="zoe",
+            now=datetime(2026, 8, 30, 17, 0, 1, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(1, len(transitioned))
+
+    def test_overdue_evaluation_is_idempotent(self):
+        record = self.candidate(due_at=NOW - timedelta(minutes=1))
+        self.ledger.confirm(actor_id="zoe", commitment_id=record.commitment_id)
+
+        first = self.ledger.evaluate_overdue(actor_id="zoe", now=NOW)
+        second = self.ledger.evaluate_overdue(actor_id="zoe", now=NOW)
+
+        self.assertEqual(1, len(first))
+        self.assertEqual([], second)
+
+    def test_nudges_include_only_unresolved_overdue_promises(self):
+        overdue = self.candidate(due_at=NOW - timedelta(minutes=1))
+        self.ledger.confirm(actor_id="zoe", commitment_id=overdue.commitment_id)
+        done = self.candidate(
+            source_id="done-message", due_at=NOW - timedelta(minutes=2)
+        )
+        self.ledger.confirm(actor_id="zoe", commitment_id=done.commitment_id)
+        self.ledger.mark_done(actor_id="zoe", commitment_id=done.commitment_id)
+
+        nudges = self.ledger.prepare_overdue_nudges(actor_id="zoe", now=NOW)
+
+        self.assertEqual([overdue.commitment_id], [item["commitment_id"] for item in nudges])
+
+    def test_likely_done_promise_is_never_nudged(self):
+        record = self.candidate(due_at=NOW - timedelta(minutes=1))
+        self.ledger.confirm(actor_id="zoe", commitment_id=record.commitment_id)
+        self.ledger.mark_likely_done(
+            actor_id="zoe",
+            commitment_id=record.commitment_id,
+            evidence=PromiseEvidence(
+                kind="handoff",
+                source="gmail",
+                summary="The promised item appears to have been sent.",
+                confidence=0.9,
+                observed_at=NOW,
+            ),
+        )
+
+        self.assertEqual([], self.ledger.prepare_overdue_nudges(actor_id="zoe", now=NOW))
+
 
 class DynamoDbV2CompatibilityTests(unittest.TestCase):
     def record(self):
