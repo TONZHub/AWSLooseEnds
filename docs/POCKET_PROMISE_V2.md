@@ -11,7 +11,7 @@ Gmail SENT mail
     ↓
 Render watcher (10-minute poll)
     ↓
-Nova / AgentCore Arbiter
+Claude Sonnet 4.6 / AgentCore Arbiter
     ↓
 CANDIDATE
     ↓ explicit user confirmation

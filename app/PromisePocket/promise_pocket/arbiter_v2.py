@@ -1,4 +1,4 @@
-"""Nova/Strands Arbiter for Pocket Promise v2.
+"""Claude/Strands Arbiter for Pocket Promise v2.
 
 The model may *propose* candidate commitments from one outgoing source message.
 It never confirms, completes, cancels, or otherwise mutates commitment state.

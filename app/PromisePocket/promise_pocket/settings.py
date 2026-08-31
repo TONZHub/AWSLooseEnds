@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import os
 
 
-DEFAULT_MODEL_ID = "us.amazon.nova-lite-v1:0"
+DEFAULT_MODEL_ID = "us.anthropic.claude-sonnet-4-6"
 
 
 @dataclass(frozen=True, slots=True)
