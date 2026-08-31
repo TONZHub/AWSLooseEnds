@@ -67,6 +67,14 @@ async def scan_connection(connection: GoogleConnection) -> dict:
         )
         likely_done_count += len(reconciliation.get("likely_done_ids") or [])
 
+    # Prepare proactive reminders only after reconciliation has had a chance to
+    # move fulfilled promises to LIKELY_DONE. This path returns nudge payloads;
+    # it deliberately does not deliver them.
+    overdue = await asyncio.to_thread(
+        agentcore.prepare_overdue_nudges,
+        actor_id=connection.actor_id,
+    )
+
     # Only advance the cursor after every discovered message made it through
     # AgentCore. If anything raises, the overlap will retry the batch next time.
     store.update_last_checked(actor_id=connection.actor_id, checked_at=scan_started)
@@ -75,6 +83,8 @@ async def scan_connection(connection: GoogleConnection) -> dict:
         "messages_checked": len(messages),
         "candidates_seen": candidate_count,
         "likely_done_seen": likely_done_count,
+        "overdue_seen": len(overdue.get("overdue_ids") or []),
+        "nudges_prepared": overdue.get("nudges") or [],
         "checked_at": scan_started.isoformat(),
     }
 

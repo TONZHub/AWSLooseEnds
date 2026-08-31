@@ -159,6 +159,16 @@ def _invoke_v2(
             "items": [record.model_dump(mode="json") for record in records],
         }
 
+    if operation == "v2_overdue":
+        now = _parse_now(payload.get("now"))
+        transitioned = v2_ledger.evaluate_overdue(actor_id=actor_id, now=now)
+        nudges = v2_ledger.prepare_overdue_nudges(actor_id=actor_id, now=now)
+        return {
+            "operation": operation,
+            "overdue_ids": [record.commitment_id for record in transitioned],
+            "nudges": nudges,
+        }
+
     if operation == "v2_confirm":
         record = v2_ledger.confirm(
             actor_id=actor_id,

@@ -81,3 +81,29 @@ class PocketPromiseAgentCoreClient:
             actor_id=actor_id,
             source_message=source_message,
         )
+
+    def prepare_overdue_nudges(self, *, actor_id: str) -> dict[str, Any]:
+        payload = {
+            "operation": "v2_overdue",
+            "actor_id": actor_id,
+        }
+        digest = hashlib.sha256(f"v2_overdue:{actor_id}".encode("utf-8")).hexdigest()
+        response = self._client.invoke_agent_runtime(
+            agentRuntimeArn=self._settings.agent_runtime_arn,
+            qualifier="DEFAULT",
+            runtimeSessionId=f"watcher-v2-overdue-{digest}",
+            runtimeUserId=actor_id,
+            contentType="application/json",
+            accept="application/json",
+            payload=json.dumps(payload).encode("utf-8"),
+        )
+        if response.get("statusCode") != 200:
+            raise RuntimeError(f"AgentCore returned status {response.get('statusCode')}")
+        body = response["response"]
+        raw = body.read() if hasattr(body, "read") else b"".join(body)
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        result = json.loads(raw)
+        if not isinstance(result, dict):
+            raise ValueError("AgentCore returned a non-object response")
+        return result

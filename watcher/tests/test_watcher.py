@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import base64
 from datetime import datetime, timedelta, timezone
+import io
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from cryptography.fernet import Fernet
 
 from google_client import _message_to_source
+from agentcore_client import PocketPromiseAgentCoreClient
 from store import ConnectionStore
 
 
@@ -110,6 +115,39 @@ class GmailParsingTests(unittest.TestCase):
         self.assertEqual(body, parsed["body"])
         self.assertEqual(["jordan@example.com"], parsed["participants"])
         self.assertEqual("Mockups", parsed["subject"])
+
+
+class AgentCoreClientTests(unittest.TestCase):
+    @patch("agentcore_client.boto3.client")
+    def test_overdue_operation_only_prepares_nudges(self, build_client):
+        runtime = build_client.return_value
+        runtime.invoke_agent_runtime.return_value = {
+            "statusCode": 200,
+            "response": io.BytesIO(
+                json.dumps(
+                    {
+                        "operation": "v2_overdue",
+                        "overdue_ids": ["promise-1"],
+                        "nudges": [{"commitment_id": "promise-1"}],
+                    }
+                ).encode("utf-8")
+            ),
+        }
+        settings = SimpleNamespace(
+            aws_region="us-east-1",
+            agent_runtime_arn="arn:example",
+        )
+        client = PocketPromiseAgentCoreClient(settings)
+
+        result = client.prepare_overdue_nudges(actor_id="zoe")
+
+        self.assertEqual(["promise-1"], result["overdue_ids"])
+        request = runtime.invoke_agent_runtime.call_args.kwargs
+        self.assertEqual(
+            {"operation": "v2_overdue", "actor_id": "zoe"},
+            json.loads(request["payload"]),
+        )
+        self.assertNotIn("notification", request)
 
 
 if __name__ == "__main__":
