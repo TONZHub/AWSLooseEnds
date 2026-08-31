@@ -17,6 +17,7 @@ from promise_pocket.ingest_v2 import SourceMessage
 from promise_pocket.ledger_v2 import PromiseLedger, PromiseState
 from promise_pocket.ledger_v2_storage import build_ledger_v2_store
 from promise_pocket.reconcile_v2 import build_evidence_agent, reconcile_outgoing_message
+from promise_pocket.review_v2 import build_review_queue
 from promise_pocket.service import CommitmentService
 from promise_pocket.settings import Settings
 from promise_pocket.storage import build_store
@@ -157,6 +158,18 @@ def _invoke_v2(
         return {
             "operation": operation,
             "items": [record.model_dump(mode="json") for record in records],
+        }
+
+    if operation == "v2_review":
+        items = build_review_queue(
+            v2_ledger,
+            actor_id=actor_id,
+            now=_parse_now(payload.get("now")),
+        )
+        return {
+            "operation": operation,
+            "attention_required": bool(items),
+            "items": [item.model_dump(mode="json") for item in items],
         }
 
     if operation == "v2_overdue":

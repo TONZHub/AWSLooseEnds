@@ -190,14 +190,136 @@ class AlexaAdapterTests(unittest.TestCase):
             lambda_function,
             "_invoke",
             return_value={"attention_required": False, "items": []},
-        ):
+        ) as invoke:
             response = lambda_function.lambda_handler(
                 event("ReviewPromisePocketIntent"), None
             )
+        self.assertEqual("v2_review", invoke.call_args.args[1]["operation"])
         self.assertEqual(
             "Promise Pocket here. Nothing needs you right now.",
             response["response"]["outputSpeech"]["text"],
         )
+
+    def test_review_asks_about_one_v2_item_and_preserves_context(self):
+        with patch.object(
+            lambda_function,
+            "_invoke",
+            return_value={
+                "attention_required": True,
+                "items": [
+                    {
+                        "commitment_id": "promise-1",
+                        "kind": "confirm_likely_done",
+                        "prompt": "It looks like you sent the document. Should I mark it done?",
+                    },
+                    {
+                        "commitment_id": "promise-2",
+                        "kind": "resolve_overdue",
+                        "prompt": "Another promise is overdue. Did you finish it?",
+                    },
+                ],
+            },
+        ):
+            response = lambda_function.lambda_handler(
+                event("ReviewPromisePocketIntent"), None
+            )
+
+        self.assertFalse(response["response"]["shouldEndSession"])
+        self.assertIn("sent the document", response["response"]["outputSpeech"]["text"])
+        self.assertNotIn("Another promise", response["response"]["outputSpeech"]["text"])
+        self.assertEqual(
+            "promise-1",
+            response["sessionAttributes"][lambda_function.PENDING_REVIEW_ID],
+        )
+        self.assertEqual(
+            "confirm_likely_done",
+            response["sessionAttributes"][lambda_function.PENDING_REVIEW_KIND],
+        )
+
+    def review_answer_event(self, intent_name: str, review_kind: str):
+        request = event(intent_name, new_session=False)
+        request["session"]["attributes"] = {
+            lambda_function.PENDING_REVIEW_ID: "promise-1",
+            lambda_function.PENDING_REVIEW_KIND: review_kind,
+        }
+        return request
+
+    def test_yes_confirms_candidate(self):
+        request = self.review_answer_event("AMAZON.YesIntent", "confirm_candidate")
+        with patch.object(lambda_function, "_invoke", return_value={}) as invoke:
+            response = lambda_function.lambda_handler(request, None)
+
+        self.assertEqual("v2_confirm", invoke.call_args.args[1]["operation"])
+        self.assertEqual("promise-1", invoke.call_args.args[1]["commitment_id"])
+        self.assertIn("track", response["response"]["outputSpeech"]["text"])
+
+    def test_no_rejects_candidate(self):
+        request = self.review_answer_event("AMAZON.NoIntent", "confirm_candidate")
+        with patch.object(lambda_function, "_invoke", return_value={}) as invoke:
+            lambda_function.lambda_handler(request, None)
+
+        self.assertEqual("v2_cancel", invoke.call_args.args[1]["operation"])
+
+    def test_yes_marks_likely_done_promise_done(self):
+        request = self.review_answer_event(
+            "CompleteReviewedPromiseIntent",
+            "confirm_likely_done",
+        )
+        with patch.object(lambda_function, "_invoke", return_value={}) as invoke:
+            lambda_function.lambda_handler(request, None)
+
+        self.assertEqual("v2_done", invoke.call_args.args[1]["operation"])
+
+    def test_no_reopens_likely_done_promise(self):
+        request = self.review_answer_event(
+            "KeepPromiseOpenIntent",
+            "confirm_likely_done",
+        )
+        with patch.object(lambda_function, "_invoke", return_value={}) as invoke:
+            lambda_function.lambda_handler(request, None)
+
+        self.assertEqual("v2_reopen", invoke.call_args.args[1]["operation"])
+
+    def test_yes_marks_overdue_promise_done(self):
+        request = self.review_answer_event("AMAZON.YesIntent", "resolve_overdue")
+        with patch.object(lambda_function, "_invoke", return_value={}) as invoke:
+            lambda_function.lambda_handler(request, None)
+
+        self.assertEqual("v2_done", invoke.call_args.args[1]["operation"])
+
+    def test_no_keeps_overdue_promise_open_without_mutation(self):
+        request = self.review_answer_event("AMAZON.NoIntent", "resolve_overdue")
+        with patch.object(lambda_function, "_invoke") as invoke:
+            response = lambda_function.lambda_handler(request, None)
+
+        invoke.assert_not_called()
+        self.assertIn("keep", response["response"]["outputSpeech"]["text"])
+
+    def test_yes_without_review_context_does_not_mutate_a_promise(self):
+        with patch.object(lambda_function, "_invoke") as invoke:
+            response = lambda_function.lambda_handler(
+                event("AMAZON.YesIntent", new_session=False), None
+            )
+
+        invoke.assert_not_called()
+        self.assertIn("review", response["response"]["outputSpeech"]["text"])
+
+    def test_interaction_model_includes_review_answers(self):
+        model_path = os.path.join(
+            os.path.dirname(lambda_function.__file__),
+            "interaction-model.json",
+        )
+        with open(model_path, encoding="utf-8") as model_file:
+            model = json.load(model_file)
+        intent_names = {
+            intent["name"]
+            for intent in model["interactionModel"]["languageModel"]["intents"]
+        }
+
+        self.assertIn("AMAZON.YesIntent", intent_names)
+        self.assertIn("AMAZON.NoIntent", intent_names)
+        self.assertIn("CompleteReviewedPromiseIntent", intent_names)
+        self.assertIn("KeepPromiseOpenIntent", intent_names)
 
     def test_runtime_invocation_binds_hashed_user_identity(self):
         body = BytesIO(json.dumps({"captured_commitment_ids": ["one"]}).encode())

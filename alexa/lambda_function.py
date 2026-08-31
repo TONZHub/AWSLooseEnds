@@ -23,6 +23,17 @@ LWA_CLIENT_ID = os.environ.get("LWA_CLIENT_ID", "")
 
 _agentcore = None
 
+PENDING_REVIEW_ID = "pendingV2CommitmentId"
+PENDING_REVIEW_KIND = "pendingV2ReviewKind"
+REVIEW_CONFIRM_CANDIDATE = "confirm_candidate"
+REVIEW_CONFIRM_LIKELY_DONE = "confirm_likely_done"
+REVIEW_RESOLVE_OVERDUE = "resolve_overdue"
+REVIEW_KINDS = {
+    REVIEW_CONFIRM_CANDIDATE,
+    REVIEW_CONFIRM_LIKELY_DONE,
+    REVIEW_RESOLVE_OVERDUE,
+}
+
 
 def _agentcore_client():
     global _agentcore
@@ -215,15 +226,80 @@ def _capture(event: dict[str, Any], intent: dict[str, Any]):
 
 
 def _review(event: dict[str, Any]):
-    result = _invoke(event, {"operation": "review"})
+    result = _invoke(event, {"operation": "v2_review"})
     items = result.get("items", [])
     if not items:
         return _speech(_first_turn(event, "Nothing needs you right now."))
-    prompts = [item.get("prompt") or item.get("summary") for item in items[:3]]
-    prompts = [prompt for prompt in prompts if isinstance(prompt, str)]
-    if len(items) > 3:
-        prompts.append(f"And {len(items) - 3} more.")
-    return _speech(_first_turn(event, " ".join(prompts)))
+
+    item = items[0]
+    commitment_id = item.get("commitment_id")
+    review_kind = item.get("kind")
+    prompt = item.get("prompt")
+    if (
+        not isinstance(commitment_id, str)
+        or not commitment_id
+        or review_kind not in REVIEW_KINDS
+        or not isinstance(prompt, str)
+        or not prompt
+    ):
+        raise ValueError("AgentCore returned an invalid v2 review item")
+
+    return _speech(
+        _first_turn(event, prompt),
+        end_session=False,
+        reprompt="Say yes or no.",
+        session_attributes={
+            PENDING_REVIEW_ID: commitment_id,
+            PENDING_REVIEW_KIND: review_kind,
+        },
+    )
+
+
+def _answer_review(event: dict[str, Any], *, accepted: bool):
+    session_attributes = dict(
+        event.get("session", {}).get("attributes", {}) or {}
+    )
+    commitment_id = session_attributes.get(PENDING_REVIEW_ID)
+    review_kind = session_attributes.get(PENDING_REVIEW_KIND)
+    if (
+        not isinstance(commitment_id, str)
+        or not commitment_id
+        or review_kind not in REVIEW_KINDS
+    ):
+        return _speech(
+            "Ask me to review your Promise Pocket first, so I know which promise you mean."
+        )
+
+    if review_kind == REVIEW_CONFIRM_CANDIDATE:
+        operation = "v2_confirm" if accepted else "v2_cancel"
+        confirmation = (
+            "Okay. I'll track that promise."
+            if accepted
+            else "Okay. I won't track that promise."
+        )
+    elif review_kind == REVIEW_CONFIRM_LIKELY_DONE:
+        operation = "v2_done" if accepted else "v2_reopen"
+        confirmation = (
+            "Done. I closed that promise."
+            if accepted
+            else "Okay. I reopened that promise."
+        )
+    elif accepted:
+        operation = "v2_done"
+        confirmation = "Done. I closed that promise."
+    else:
+        # A negative answer to an overdue review is itself useful human input,
+        # but it must not change state or fabricate completion.
+        return _speech("Okay. I'll keep that promise open.")
+
+    _invoke(
+        event,
+        {
+            "operation": operation,
+            "commitment_id": commitment_id,
+        },
+    )
+    return _speech(confirmation)
 
 
 def _clarify(event: dict[str, Any], intent: dict[str, Any]):
@@ -295,12 +371,17 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return _capture(event, intent)
         if name == "ReviewPromisePocketIntent":
             return _review(event)
+        if name in {"AMAZON.YesIntent", "CompleteReviewedPromiseIntent"}:
+            return _answer_review(event, accepted=True)
+        if name in {"AMAZON.NoIntent", "KeepPromiseOpenIntent"}:
+            return _answer_review(event, accepted=False)
         if name == "ClarifyCommitmentIntent":
             return _clarify(event, intent)
         if name == "AMAZON.HelpIntent":
             return _speech(
                 _first_turn(
-                    event, "Try saying, I promised to call Mom tomorrow at noon."
+                    event,
+                    "Try saying, review my Promise Pocket, or, I promised to call Mom tomorrow at noon.",
                 ),
                 end_session=False,
                 reprompt="What should I remember?",

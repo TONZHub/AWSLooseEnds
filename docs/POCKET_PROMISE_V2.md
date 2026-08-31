@@ -14,16 +14,38 @@ Render watcher (10-minute poll)
 Claude Sonnet 4.6 / AgentCore Arbiter
     ↓
 CANDIDATE
-    ↓ explicit user confirmation
+    ↓ explicit Alexa/app confirmation
 ACTIVE
     ↓
 LIKELY_DONE / OVERDUE
-    ↓ user confirms
+    ↓ explicit Alexa/app confirmation
 DONE
 ```
 
 The model may create a `CANDIDATE`. It may never silently promote that candidate
 to `ACTIVE` or claim completion as fact.
+
+## Alexa v2 review flow
+
+Alexa is a human-authority adapter over the same durable v2 ledger. Say
+`Alexa, open Promise Pocket`, then `review my Promise Pocket`. Alexa presents
+one deterministic review item at a time:
+
+- `CANDIDATE`: asks whether Pocket Promise should track the detected promise.
+  Yes calls `v2_confirm`; no calls `v2_cancel`.
+- `LIKELY_DONE`: asks whether the evidence means the promise is complete. Yes
+  calls `v2_done`; no calls `v2_reopen`.
+- `OVERDUE`: asks whether the promise was finished. Yes calls `v2_done`; no
+  leaves the promise overdue and unresolved.
+
+The pending commitment ID and review kind live only in the signed Alexa session
+attributes for the question being answered. A bare yes/no without that review
+context cannot mutate a promise.
+
+For a cross-system Gmail-to-Alexa demo, enable Alexa account linking and set the
+watcher's `DEMO_ACTOR_ID` to the same pseudonymous `amazon-...` actor ID. Without
+that shared identity, Gmail and an unlinked Alexa skill correctly see isolated
+ledgers.
 
 ## Google Cloud setup
 
@@ -106,6 +128,8 @@ admin-protected start route.
    same HTTP Basic credentials.
 7. Inspect the v2 ledger. Expected state: `candidate`.
 8. Confirm the candidate through the v2 API/app. Expected state: `active`.
+9. Ask Alexa to `review my Promise Pocket` and answer the state-specific
+   question with yes/no. Verify the v2 ledger reflects only the explicit answer.
 
 Example manual scan with curl:
 
@@ -131,5 +155,5 @@ curl -u "admin:$WATCHER_ADMIN_KEY" -X POST \
 - Production user/account identity bridging.
 - Android candidate-confirmation UI and push notifications.
 - Evidence reconciliation against later mail/Drive activity.
-- Alexa v2 review/enforcement flow.
+- Proactive Alexa notifications outside an active skill session.
 - Public Google OAuth verification.
