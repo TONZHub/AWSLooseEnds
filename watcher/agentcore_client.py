@@ -17,29 +17,28 @@ class PocketPromiseAgentCoreClient:
             region_name=settings.aws_region,
         )
 
-    def _invoke_source_operation(
+    def _invoke_operation(
         self,
         *,
         operation: str,
         actor_id: str,
-        source_message: dict[str, Any],
+        extra_payload: dict[str, Any] | None = None,
+        session_seed: str | None = None,
     ) -> dict[str, Any]:
-        source_id = str(source_message.get("source_id") or "unknown")
+        seed = session_seed or operation
         digest = hashlib.sha256(
-            f"{operation}:{actor_id}:{source_id}".encode("utf-8")
+            f"{operation}:{actor_id}:{seed}".encode("utf-8")
         ).hexdigest()
         safe_operation = operation.replace("_", "-")
-        session_id = f"watcher-{safe_operation}-{digest}"
         payload = {
             "operation": operation,
             "actor_id": actor_id,
-            "source_message": source_message,
-            "timezone": self._settings.timezone_name,
+            **(extra_payload or {}),
         }
         response = self._client.invoke_agent_runtime(
             agentRuntimeArn=self._settings.agent_runtime_arn,
             qualifier="DEFAULT",
-            runtimeSessionId=session_id,
+            runtimeSessionId=f"watcher-{safe_operation}-{digest}",
             runtimeUserId=actor_id,
             contentType="application/json",
             accept="application/json",
@@ -57,6 +56,24 @@ class PocketPromiseAgentCoreClient:
         if not isinstance(result, dict):
             raise ValueError("AgentCore returned a non-object response")
         return result
+
+    def _invoke_source_operation(
+        self,
+        *,
+        operation: str,
+        actor_id: str,
+        source_message: dict[str, Any],
+    ) -> dict[str, Any]:
+        source_id = str(source_message.get("source_id") or "unknown")
+        return self._invoke_operation(
+            operation=operation,
+            actor_id=actor_id,
+            extra_payload={
+                "source_message": source_message,
+                "timezone": self._settings.timezone_name,
+            },
+            session_seed=source_id,
+        )
 
     def arbitrate_message(
         self,
@@ -83,27 +100,13 @@ class PocketPromiseAgentCoreClient:
         )
 
     def prepare_overdue_nudges(self, *, actor_id: str) -> dict[str, Any]:
-        payload = {
-            "operation": "v2_overdue",
-            "actor_id": actor_id,
-        }
-        digest = hashlib.sha256(f"v2_overdue:{actor_id}".encode("utf-8")).hexdigest()
-        response = self._client.invoke_agent_runtime(
-            agentRuntimeArn=self._settings.agent_runtime_arn,
-            qualifier="DEFAULT",
-            runtimeSessionId=f"watcher-v2-overdue-{digest}",
-            runtimeUserId=actor_id,
-            contentType="application/json",
-            accept="application/json",
-            payload=json.dumps(payload).encode("utf-8"),
+        return self._invoke_operation(
+            operation="v2_overdue",
+            actor_id=actor_id,
         )
-        if response.get("statusCode") != 200:
-            raise RuntimeError(f"AgentCore returned status {response.get('statusCode')}")
-        body = response["response"]
-        raw = body.read() if hasattr(body, "read") else b"".join(body)
-        if isinstance(raw, bytes):
-            raw = raw.decode("utf-8")
-        result = json.loads(raw)
-        if not isinstance(result, dict):
-            raise ValueError("AgentCore returned a non-object response")
-        return result
+
+    def create_alexa_pairing(self, *, actor_id: str) -> dict[str, Any]:
+        return self._invoke_operation(
+            operation="pair_create",
+            actor_id=actor_id,
+        )

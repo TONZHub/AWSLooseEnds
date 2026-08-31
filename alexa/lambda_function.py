@@ -135,8 +135,8 @@ def _linked_amazon_actor_id(access_token: str) -> str:
 def _actor_id(event: dict[str, Any]) -> str:
     access_token = _alexa_access_token(event)
     if access_token:
-        # Account linking and the Android app use the same LWA security profile,
-        # so both surfaces resolve to one pseudonymous ledger identity.
+        # Keep compatibility with an already-linked account, but pairing no
+        # longer depends on Alexa account linking being available.
         return _linked_amazon_actor_id(access_token)
 
     alexa_user_id = (
@@ -222,6 +222,33 @@ def _capture(event: dict[str, Any], intent: dict[str, Any]):
         ),
         end_session=False,
         reprompt="Tell me what you need to do and when.",
+    )
+
+
+def _pair(event: dict[str, Any], intent: dict[str, Any]):
+    code = _slot_value(intent, "code")
+    if not code:
+        return _speech(
+            _first_turn(event, "What's the six digit linking code?"),
+            end_session=False,
+            reprompt="Say the six digit code from Promise Pocket.",
+        )
+
+    digits = "".join(character for character in code if character.isdigit())
+    if len(digits) != 6:
+        return _speech(
+            _first_turn(event, "That linking code should be six digits. Try it again."),
+            end_session=False,
+            reprompt="Say the six digit code from Promise Pocket.",
+        )
+
+    result = _invoke(event, {"operation": "pair_claim", "code": digits})
+    if result.get("linked") is True:
+        return _speech(
+            _first_turn(event, "Connected. Your Alexa promises will use the same pocket now.")
+        )
+    return _speech(
+        _first_turn(event, "That code is invalid or expired. Make a new linking code and try again.")
     )
 
 
@@ -369,6 +396,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         name = intent.get("name")
         if name == "CaptureCommitmentIntent":
             return _capture(event, intent)
+        if name == "LinkAlexaIntent":
+            return _pair(event, intent)
         if name == "ReviewPromisePocketIntent":
             return _review(event)
         if name in {"AMAZON.YesIntent", "CompleteReviewedPromiseIntent"}:
@@ -381,7 +410,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return _speech(
                 _first_turn(
                     event,
-                    "Try saying, review my Promise Pocket, or, I promised to call Mom tomorrow at noon.",
+                    "Try saying, link code 4 8 2 7 3 1, review my Promise Pocket, or, I promised to call Mom tomorrow at noon.",
                 ),
                 end_session=False,
                 reprompt="What should I remember?",

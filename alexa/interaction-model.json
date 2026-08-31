@@ -28,6 +28,22 @@
           ]
         },
         {
+          "name": "LinkAlexaIntent",
+          "slots": [
+            {"name": "code", "type": "AMAZON.NUMBER"}
+          ],
+          "samples": [
+            "link {code}",
+            "link code {code}",
+            "connect {code}",
+            "connect code {code}",
+            "pair {code}",
+            "pair code {code}",
+            "link my account with {code}",
+            "connect my account with {code}"
+          ]
+        },
+        {
           "name": "ClarifyCommitmentIntent",
           "slots": [
             {"name": "answer", "type": "AMAZON.TIME"}

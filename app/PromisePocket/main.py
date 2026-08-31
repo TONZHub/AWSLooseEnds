@@ -16,6 +16,7 @@ from promise_pocket.arbiter_v2 import arbitrate_outgoing_message, build_arbiter_
 from promise_pocket.ingest_v2 import SourceMessage
 from promise_pocket.ledger_v2 import PromiseLedger, PromiseState
 from promise_pocket.ledger_v2_storage import build_ledger_v2_store
+from promise_pocket.pairing import build_pairing_store
 from promise_pocket.reconcile_v2 import build_evidence_agent, reconcile_outgoing_message
 from promise_pocket.review_v2 import build_review_queue
 from promise_pocket.service import CommitmentService
@@ -27,6 +28,7 @@ app = BedrockAgentCoreApp()
 settings = Settings.from_environment()
 service = CommitmentService(build_store(settings))
 v2_ledger = PromiseLedger(build_ledger_v2_store(settings))
+pairing_store = build_pairing_store(settings)
 
 
 def _actor_id(payload: dict[str, Any], context: Any | None) -> str:
@@ -58,6 +60,13 @@ def _require_commitment_id(payload: dict[str, Any]) -> str:
     if not isinstance(commitment_id, str) or not commitment_id.strip():
         raise ValueError("commitment_id is required")
     return commitment_id.strip()
+
+
+def _require_pairing_code(payload: dict[str, Any]) -> str:
+    code = payload.get("code")
+    if not isinstance(code, str) or not code.strip():
+        raise ValueError("pairing code is required")
+    return code.strip()
 
 
 def _source_message(payload: dict[str, Any], operation: str) -> SourceMessage:
@@ -218,15 +227,38 @@ def _invoke_v2(
 
 @app.entrypoint
 def invoke(payload: dict[str, Any], context: Any | None = None) -> dict[str, Any]:
-    """Route Pocket Promise v2 and legacy Promise Pocket operations."""
+    """Route Pocket Promise pairing, v2, and legacy operations."""
 
     if not isinstance(payload, dict):
         raise ValueError("payload must be a JSON object")
 
-    actor_id = _actor_id(payload, context)
+    source_actor_id = _actor_id(payload, context)
     operation = payload.get("operation", "capture")
     if not isinstance(operation, str):
         raise ValueError("operation must be a string")
+
+    if operation == "pair_create":
+        pairing = pairing_store.create(target_actor_id=source_actor_id)
+        return {
+            "operation": operation,
+            "code": pairing.code,
+            "expires_at": pairing.expires_at.isoformat(),
+        }
+
+    if operation == "pair_claim":
+        target_actor_id = pairing_store.claim(
+            source_actor_id=source_actor_id,
+            code=_require_pairing_code(payload),
+        )
+        return {
+            "operation": operation,
+            "linked": target_actor_id is not None,
+        }
+
+    # Pairing is deliberately resolved inside the IAM-authorized runtime. Alexa
+    # only supplies its opaque, pseudonymous actor id; linked surfaces then land
+    # in the same ledger without giving the Alexa Lambda direct DynamoDB access.
+    actor_id = pairing_store.resolve(source_actor_id)
 
     v2_response = _invoke_v2(
         operation=operation,
@@ -279,7 +311,8 @@ def invoke(payload: dict[str, Any], context: Any | None = None) -> dict[str, Any
 
     if operation != "capture":
         raise ValueError(
-            "operation must be capture, clarify, review, or a supported v2 operation"
+            "operation must be capture, clarify, review, pair_create, pair_claim, "
+            "or a supported v2 operation"
         )
 
     prompt = payload.get("prompt")
