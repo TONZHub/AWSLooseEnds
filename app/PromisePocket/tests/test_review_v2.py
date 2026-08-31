@@ -133,6 +133,19 @@ class PromiseReviewV2Tests(unittest.TestCase):
         self.assertEqual(1, len(queue))
         self.assertEqual("send the revised document", queue[0].deliverable)
 
+    def test_voice_prompt_normalizes_sentence_case_and_terminal_punctuation(self):
+        self.candidate(
+            "voice-prompt",
+            deliverable="Send the revised document by 3 PM tomorrow.",
+        )
+
+        queue = build_review_queue(self.ledger, actor_id="zoe", now=NOW)
+
+        self.assertEqual(
+            "I noticed you promised to send the revised document by 3 PM tomorrow. Should I track that?",
+            queue[0].prompt,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

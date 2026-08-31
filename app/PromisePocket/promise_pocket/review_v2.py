@@ -34,7 +34,15 @@ _PRIORITY = {
 }
 
 
+def _spoken_deliverable(record: PromiseRecord) -> str:
+    text = record.deliverable.strip().rstrip(".!?").strip()
+    if len(text) > 1 and text[0].isupper() and text[1].islower():
+        return text[0].lower() + text[1:]
+    return text
+
+
 def _review_item(record: PromiseRecord) -> PromiseReviewItem | None:
+    spoken_deliverable = _spoken_deliverable(record)
     if record.status is PromiseState.LIKELY_DONE:
         return PromiseReviewItem(
             commitment_id=record.commitment_id,
@@ -42,7 +50,7 @@ def _review_item(record: PromiseRecord) -> PromiseReviewItem | None:
             status=record.status,
             deliverable=record.deliverable,
             prompt=(
-                f"It looks like you may have finished: {record.deliverable}. "
+                f"It looks like you may have finished {spoken_deliverable}. "
                 "Should I mark it done?"
             ),
             due_at=record.due_at,
@@ -54,7 +62,7 @@ def _review_item(record: PromiseRecord) -> PromiseReviewItem | None:
             status=record.status,
             deliverable=record.deliverable,
             prompt=(
-                f"This promise is overdue: {record.deliverable}. "
+                f"This promise is overdue: {spoken_deliverable}. "
                 "Have you finished it?"
             ),
             due_at=record.due_at,
@@ -66,7 +74,7 @@ def _review_item(record: PromiseRecord) -> PromiseReviewItem | None:
             status=record.status,
             deliverable=record.deliverable,
             prompt=(
-                f"I noticed you promised to {record.deliverable}. "
+                f"I noticed you promised to {spoken_deliverable}. "
                 "Should I track that?"
             ),
             due_at=record.due_at,
