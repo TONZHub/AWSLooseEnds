@@ -65,14 +65,12 @@ Local JSON storage exists only for development. The settings layer fails closed 
 
 The local demo accepts `actor_id` in the invocation payload. That fallback is enabled only under `LOCAL_DEV=1`. Deployed invocations bind the actor to AgentCore’s authenticated `context.user_id`; identity is never selectable by the language model or untrusted prompt text.
 
-The Android app optionally uses Login with Amazon. It hashes the returned LWA
-`user_id` as `amazon-<sha256>` before selecting a local Room partition. When the
-Alexa skill is account-linked through the same LWA security profile, its Lambda
-first verifies the token audience, fetches the profile from Amazon over HTTPS,
-and derives the identical actor ID. Raw Amazon IDs and bearer tokens are not sent
-to AgentCore or written to DynamoDB.
+The Alexa adapter hashes Amazon's opaque skill user ID into an
+`alexa-<sha256>` source identity before invoking AgentCore. A trusted surface can
+create a six-digit code for a target ledger; Alexa claims that code and AgentCore
+stores the source-to-target mapping beside the ledger. Codes are single-use and
+expire after ten minutes.
 
-Alexa requests without account linking retain the pre-existing
-`alexa-<sha256(skill-user-id)>` partition. This keeps the skill useful before a
-user links it and prevents an invalid linked token from silently falling back to
-another identity.
+Pairing is resolved inside the IAM-authorized runtime before any ledger
+operation. The language model cannot select an actor, and neither Login with
+Amazon profile data nor bearer tokens are required.
