@@ -19,10 +19,10 @@ That becomes a structured loose end, waits without nagging, and surfaces with ze
   - **Due Now**: Actionable items whose exact deadline has arrived.
   - **Blocked**: Promises blocked by an external reason.
 - **Autonomous Safe Work vs Human Action**: Distinguishes between work that requires direct human intervention (calling, paying, deciding) versus quiet background agent preparation.
-- **Offline-First Room Database**: Structured persistence with `CommitmentEntity` and isolation between the local ledger and an optional signed-in Amazon identity.
+- **Offline-First Room Database**: Structured local persistence with `CommitmentEntity`.
 - **Gemini API Integration**: Uses `gemini-3.5-flash` with structured JSON output for parsing when configured, backed by an intelligent local heuristic parser.
 - **Polished Material 3 UI**: Soft Sand & Slate palette, responsive status chips, quick capture bar, and custom adaptive app launcher icons.
-- **Login with Amazon**: Optional Amazon identity in the Android app, with the same pseudonymous actor contract used by account-linked Alexa requests.
+- **OAuth-Free Alexa Pairing**: A short-lived, single-use six-digit code connects an Alexa device identity to the intended ledger without Login with Amazon.
 
 ---
 
@@ -58,31 +58,16 @@ Execute unit tests directly with Gradle:
 gradle :app:testDebugUnitTest
 ```
 
-## Configure Login with Amazon
+## Pair Alexa without account linking
 
-The code and official Login with Amazon 3.1.6 SDK are included. A working build
-still needs an API key tied to the exact Android package and signing certificate:
+The watcher can generate a single-use pairing code for its configured demo
+ledger:
 
-1. In the Login with Amazon console, create or select the **Promise Pocket**
-   security profile and add Android settings.
-2. Register package `com.mosslet.promisepocket` with both the MD5 and
-   SHA-256 fingerprints from the keystore used to sign the APK.
-3. Copy `app/src/main/assets/api_key.txt.example` to
-   `app/src/main/assets/api_key.txt`, then replace its contents with the generated
-   Android API key. The real file is gitignored.
-4. Use the same security profile for Alexa account linking. Configure an
-   authorization-code grant with:
-   - Authorization URI: `https://www.amazon.com/ap/oa`
-   - Access Token URI: `https://api.amazon.com/auth/o2/token`
-   - Scope: `profile:user_id`
-   - Client ID and secret: the Login with Amazon security profile credentials
-5. Redeploy `infra/alexa-template.yaml` with that client ID as
-   `LoginWithAmazonClientId` so Lambda verifies each linked token before using it.
+1. Open the admin-protected watcher route `/alexa/pair`.
+2. Say `Alexa, tell Promise Pocket to link code 482731`, replacing the example
+   with the displayed six digits.
+3. Alexa claims the code through AgentCore and binds its pseudonymous skill user
+   identity to that ledger.
 
-Unlinked Alexa users keep the existing skill-scoped identity. Linked Alexa
-requests and Android sign-in hash the Login with Amazon `user_id` into the same
-`amazon-…` actor ID; the raw Amazon identifier and access token are never stored
-in the commitment ledger.
-
-Amazon sign-in establishes shared identity. The current Android ledger remains
-offline-first in Room until the cloud sync milestone is implemented.
+Codes expire after ten minutes and can be claimed only once. Login with Amazon,
+an OAuth token proxy, and an Amazon profile permission are not required.

@@ -42,10 +42,11 @@ The pending commitment ID and review kind live only in the signed Alexa session
 attributes for the question being answered. A bare yes/no without that review
 context cannot mutate a promise.
 
-For a cross-system Gmail-to-Alexa demo, enable Alexa account linking and set the
-watcher's `DEMO_ACTOR_ID` to the same pseudonymous `amazon-...` actor ID. Without
-that shared identity, Gmail and an unlinked Alexa skill correctly see isolated
-ledgers.
+For a cross-system Gmail-to-Alexa demo, set the watcher's `DEMO_ACTOR_ID`, open
+the admin-protected `/alexa/pair` route, and speak the displayed six-digit code
+to Promise Pocket on Alexa. AgentCore resolves that Alexa device's pseudonymous
+identity to the demo ledger. The code is single-use and expires after ten
+minutes; Amazon account linking is not used.
 
 ## Google Cloud setup
 
@@ -63,7 +64,7 @@ ledgers.
 Google's Testing publishing status limits the app to configured test users and
 non-basic authorizations expire after seven days, including offline refresh
 tokens. That is acceptable for the hackathon demo but is not a production
-account-linking strategy.
+authentication strategy.
 
 ## Render setup
 
@@ -96,8 +97,8 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
 For the first watcher smoke test, `DEMO_ACTOR_ID` may be a controlled demo
-identity. Before the cross-device demo, replace it with the canonical actor ID
-used by the Android/Alexa identity bridge.
+identity. The `/alexa/pair` route creates a code that maps the Alexa skill user
+to that actor inside AgentCore.
 
 The AWS credential used by Render should be a dedicated least-privilege identity
 that can invoke only the deployed AgentCore runtime. Do not put an administrator
@@ -128,7 +129,8 @@ admin-protected start route.
    same HTTP Basic credentials.
 7. Inspect the v2 ledger. Expected state: `candidate`.
 8. Confirm the candidate through the v2 API/app. Expected state: `active`.
-9. Ask Alexa to `review my Promise Pocket` and answer the state-specific
+9. Open `/alexa/pair` and speak the displayed code to Promise Pocket on Alexa.
+10. Ask Alexa to `review my Promise Pocket` and answer the state-specific
    question with yes/no. Verify the v2 ledger reflects only the explicit answer.
 
 Example manual scan with curl:
@@ -152,7 +154,7 @@ curl -u "admin:$WATCHER_ADMIN_KEY" -X POST \
 
 ## Not built yet
 
-- Production user/account identity bridging.
+- Production multi-user identity and pairing management.
 - Android candidate-confirmation UI and push notifications.
 - Evidence reconciliation against later mail/Drive activity.
 - Proactive Alexa notifications outside an active skill session.

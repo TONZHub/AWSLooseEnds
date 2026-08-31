@@ -12,11 +12,6 @@ Parameters:
   UserTimezone:
     Type: String
     Default: America/New_York
-  LoginWithAmazonClientId:
-    Type: String
-    Default: ""
-    NoEcho: true
-
 Resources:
   AlexaAdapter:
     Type: AWS::Serverless::Function
@@ -34,7 +29,6 @@ Resources:
           AGENT_RUNTIME_ARN: !Ref AgentRuntimeArn
           ALEXA_SKILL_ID: !Ref AlexaSkillId
           LOOSE_ENDS_TIMEZONE: !Ref UserTimezone
-          LWA_CLIENT_ID: !Ref LoginWithAmazonClientId
       Policies:
         - Statement:
             - Sid: InvokeLooseEndsRuntime
@@ -51,38 +45,7 @@ Resources:
           Properties:
             SkillId: !Ref AlexaSkillId
 
-  OAuthProxyApi:
-    Type: AWS::Serverless::HttpApi
-    Properties:
-      StageName: '$default'
-
-  OAuthTokenProxy:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: loose-ends-alexa-oauth-proxy
-      Description: Redacting diagnostic proxy for Alexa Login with Amazon token exchange.
-      CodeUri: ../alexa/
-      Handler: oauth_proxy.lambda_handler
-      Runtime: python3.12
-      Architectures: [arm64]
-      MemorySize: 128
-      Timeout: 10
-      Environment:
-        Variables:
-          LWA_CLIENT_ID: !Ref LoginWithAmazonClientId
-          LWA_TOKEN_URI: https://api.amazon.com/auth/o2/token
-      Events:
-        TokenExchange:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref OAuthProxyApi
-            Path: /auth/o2/token
-            Method: POST
-
 Outputs:
   AlexaLambdaArn:
     Description: Paste this ARN into the Alexa Developer Console endpoint.
     Value: !GetAtt AlexaAdapter.Arn
-  OAuthTokenProxyUrl:
-    Description: Temporary proxy URL for diagnosing Alexa account-linking token exchange.
-    Value: !Sub "https://${OAuthProxyApi}.execute-api.${AWS::Region}.amazonaws.com/auth/o2/token"

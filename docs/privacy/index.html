@@ -92,21 +92,22 @@
     <div class="mark" aria-hidden="true">♡</div>
     <h1>Promise Pocket Privacy Notice</h1>
     <p class="lede">Promise Pocket is a personal commitment tracker that helps you capture, review, and follow through on everyday promises and tasks.</p>
-    <p class="date">Last updated: August 29, 2026</p>
+    <p class="date">Last updated: August 31, 2026</p>
 
     <section class="card">
       <h2>What we collect</h2>
       <p>Promise Pocket only collects or processes information needed to provide the service.</p>
       <ul>
-        <li><strong>Amazon account information:</strong> when you choose Login with Amazon, Promise Pocket requests Amazon's profile scope. This may provide a stable Amazon user identifier, your display name, and your email address. Promise Pocket does not receive your Amazon password.</li>
+        <li><strong>Connected-source information:</strong> when you authorize the demo Gmail watcher, Promise Pocket stores the connected email address, granted scopes, and an encrypted refresh token. The watcher reads sent messages within the authorized scope to detect possible commitments.</li>
+        <li><strong>Alexa device identity:</strong> the Alexa skill supplies an opaque skill user identifier. Promise Pocket transforms it into a pseudonymous source identity before ledger use.</li>
         <li><strong>Your commitments:</strong> text you enter or say to Promise Pocket, including task or promise descriptions, due times, people you mention, clarifications, and completion or blocked status.</li>
         <li><strong>Technical information:</strong> limited session identifiers, authentication tokens, request metadata, and error information needed to sign you in, connect supported devices, and keep the service working.</li>
       </ul>
 
       <h2>How we use your information</h2>
       <ul>
-        <li>To sign you in and identify your Promise Pocket account.</li>
-        <li>To link the same Promise Pocket ledger across supported surfaces, including the Android app and Alexa.</li>
+        <li>To connect an authorized source to the configured Promise Pocket ledger.</li>
+        <li>To pair an Alexa skill user with that ledger using a short-lived, single-use code.</li>
         <li>To save, retrieve, clarify, and review your commitments.</li>
         <li>To determine when something needs your attention.</li>
         <li>To diagnose failures and protect the service from misuse.</li>
@@ -116,25 +117,24 @@
       <p>Promise Pocket can use AI to turn ordinary language into structured commitment information. When Gemini parsing is enabled, the commitment text you submit may be sent to Google's Gemini API for that purpose. Promise Pocket also includes a local parsing fallback when Gemini is unavailable or not configured.</p>
 
       <h2>Amazon and Alexa</h2>
-      <p>Login with Amazon provides an authorization token that lets Promise Pocket verify your Amazon account. Promise Pocket uses the resulting account identifier to create a pseudonymous ledger identity so the Android app and linked Alexa skill can refer to the same commitments.</p>
+      <p>Promise Pocket does not use Login with Amazon. The Alexa skill derives a pseudonymous identity from Amazon's opaque skill user identifier. A six-digit code can pair that identity with a selected ledger; the code expires after ten minutes and can be used only once.</p>
 
       <h2>Sharing</h2>
       <p>We do not sell your personal information. Information may be processed by service providers that are necessary to operate Promise Pocket, including Amazon services, Amazon Web Services, and—when AI parsing is enabled—Google's Gemini service. We do not share your information with advertisers.</p>
 
       <h2>Data retention and deletion</h2>
-      <p>Commitment information is kept for as long as needed to provide Promise Pocket unless you delete it or it is removed as part of service maintenance. Signing out of Amazon stops the active Amazon session but does not automatically delete previously saved commitments.</p>
+      <p>Commitment and connection information is kept for as long as needed to provide Promise Pocket unless you delete it, request removal, or it is removed as part of service maintenance. Revoking a connected source prevents further access but does not automatically delete existing commitments.</p>
       <p>If you want your Promise Pocket data removed, contact the project using the method below.</p>
 
       <h2>Your choices</h2>
       <ul>
-        <li>You can choose not to sign in with Amazon where sign-in is optional.</li>
-        <li>You can sign out of Amazon from Promise Pocket.</li>
+        <li>You can use the Android app locally without connecting Gmail or pairing Alexa.</li>
+        <li>You can revoke the demo Gmail authorization through your Google account settings.</li>
         <li>You can remove individual commitments from the app.</li>
-        <li>You can revoke Promise Pocket's Amazon authorization through your Amazon account settings.</li>
       </ul>
 
       <h2>Security</h2>
-      <p>Promise Pocket is designed to avoid storing raw Amazon account identifiers in the commitment ledger. Where supported, identifiers are transformed into pseudonymous IDs before being used as ledger identities. No security method is perfect, so we cannot guarantee absolute security.</p>
+      <p>Promise Pocket transforms Alexa's opaque skill user identifier before ledger use, encrypts stored Google refresh tokens, and makes pairing codes short-lived and single-use. No security method is perfect, so we cannot guarantee absolute security.</p>
 
       <h2>Children</h2>
       <p>Promise Pocket is not designed to knowingly collect personal information from children under 13.</p>
@@ -146,7 +146,7 @@
       <p>For privacy questions or deletion requests, open an issue in the public <a href="https://github.com/TONZHub/PromisePocket/issues">Promise Pocket GitHub repository</a>. Do not include passwords, access tokens, or other secrets in a public issue.</p>
 
       <div class="plain">
-        <strong>Plain-language version:</strong> Promise Pocket uses your Amazon identity to know that your phone and Alexa belong to the same Promise Pocket account. It stores the commitments you ask it to remember. It does not get your Amazon password, does not sell your data, and does not use your data for advertising.
+        <strong>Plain-language version:</strong> Promise Pocket stores the commitments you ask it to remember. The demo can read authorized sent Gmail messages and can pair Alexa to the same ledger with a temporary code. It does not use Login with Amazon, does not sell your data, and does not use your data for advertising.
       </div>
     </section>
 

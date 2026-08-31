@@ -23,7 +23,7 @@ sys.modules.setdefault("boto3", fake_boto3)
 from alexa import lambda_function
 
 
-def event(intent_name=None, commitment=None, *, new_session=True, access_token=None):
+def event(intent_name=None, commitment=None, *, new_session=True):
     request = {"type": "LaunchRequest", "requestId": "request-123"}
     if intent_name:
         slots = {}
@@ -50,9 +50,6 @@ def event(intent_name=None, commitment=None, *, new_session=True, access_token=N
         },
         "request": request,
     }
-    if access_token:
-        payload["session"]["user"]["accessToken"] = access_token
-        payload["context"]["System"]["user"]["accessToken"] = access_token
     return payload
 
 
@@ -337,40 +334,14 @@ class AlexaAdapterTests(unittest.TestCase):
         self.assertGreaterEqual(len(call["runtimeSessionId"]), 33)
         self.assertEqual(["one"], result["captured_commitment_ids"])
 
-    def test_account_linked_user_matches_android_actor_identity(self):
-        token_info = BytesIO(json.dumps({"aud": "lwa-client-123"}).encode())
-        profile = BytesIO(json.dumps({"user_id": "amazon-user-123"}).encode())
-        with (
-            patch.object(lambda_function, "LWA_CLIENT_ID", "lwa-client-123"),
-            patch.object(
-                lambda_function,
-                "urlopen",
-                side_effect=[token_info, profile],
-            ) as open_url,
-        ):
-            actor_id = lambda_function._actor_id(
-                event(access_token="Atza|linked-token")
-            )
-
-        self.assertEqual(
-            "amazon-43c29fcd70d239ecda137d6bb3c52b713d45d90196ecee0e67f6dfa24cb62de9",
-            actor_id,
-        )
-        profile_request = open_url.call_args_list[1].args[0]
-        self.assertEqual(
-            "Bearer Atza|linked-token",
-            profile_request.get_header("Authorization"),
+    def test_access_token_does_not_change_pairing_source_identity(self):
+        request = event()
+        request["session"]["user"]["accessToken"] = "Atza|stale-linked-token"
+        request["context"]["System"]["user"]["accessToken"] = (
+            "Atza|stale-linked-token"
         )
 
-    def test_account_linking_rejects_token_for_another_client(self):
-        token_info = BytesIO(json.dumps({"aud": "someone-else"}).encode())
-        with (
-            patch.object(lambda_function, "LWA_CLIENT_ID", "lwa-client-123"),
-            patch.object(lambda_function, "urlopen", return_value=token_info),
-        ):
-            with self.assertRaises(ValueError):
-                lambda_function._actor_id(event(access_token="Atza|wrong-client"))
-
+        self.assertTrue(lambda_function._actor_id(request).startswith("alexa-"))
 
 if __name__ == "__main__":
     unittest.main()

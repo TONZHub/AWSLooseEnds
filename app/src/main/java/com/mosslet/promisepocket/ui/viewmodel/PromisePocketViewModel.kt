@@ -3,7 +3,6 @@ package com.mosslet.promisepocket.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.mosslet.promisepocket.auth.AmazonAuthResult
 import com.mosslet.promisepocket.data.local.AppDatabase
 import com.mosslet.promisepocket.data.model.AttentionItem
 import com.mosslet.promisepocket.data.model.CommitmentEntity
@@ -30,11 +29,6 @@ enum class FilterTab {
 }
 
 data class PromisePocketUiState(
-    val currentActor: String = "local-user",
-    val isAmazonSignedIn: Boolean = false,
-    val isAmazonAuthLoading: Boolean = false,
-    val amazonAccountName: String? = null,
-    val amazonAccountEmail: String? = null,
     val filterTab: FilterTab = FilterTab.ALL,
     val searchQuery: String = "",
     val isCapturing: Boolean = false,
@@ -49,11 +43,14 @@ data class PromisePocketUiState(
 
 class PromisePocketViewModel(application: Application) : AndroidViewModel(application) {
 
+    private companion object {
+        const val LOCAL_ACTOR_ID = "local-user"
+    }
+
     private val repository: CommitmentRepository
     val service: CommitmentService
     private val parser = PromiseParser()
 
-    private val _currentActor = MutableStateFlow("local-user")
     private val _filterTab = MutableStateFlow(FilterTab.ALL)
     private val _searchQuery = MutableStateFlow("")
     private val _isCapturing = MutableStateFlow(false)
@@ -72,12 +69,12 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
 
         // Seed demo commitment if empty on first start
         viewModelScope.launch {
-            val existing = repository.listForActor("local-user")
+            val existing = repository.listForActor(LOCAL_ACTOR_ID)
             if (existing.isEmpty()) {
                 val now = Instant.now()
                 // 1. A commitment needing clarification (date only)
                 service.capture(
-                    actorId = "local-user",
+                    actorId = LOCAL_ACTOR_ID,
                     summary = "Call the dentist for Mom",
                     rawText = "I promised Mom I would call the dentist tomorrow",
                     dueAt = now.plus(1, ChronoUnit.DAYS).toString(),
@@ -87,7 +84,7 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
                 )
                 // 2. An exact promise with clock time
                 service.capture(
-                    actorId = "local-user",
+                    actorId = LOCAL_ACTOR_ID,
                     summary = "Send quarterly review report",
                     rawText = "Send quarterly review report by Friday at 2pm",
                     dueAt = now.plus(2, ChronoUnit.DAYS).toString(),
@@ -102,15 +99,14 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
 
     private fun refreshData() {
         viewModelScope.launch {
-            val actor = _currentActor.value
             val tab = _filterTab.value
             val query = _searchQuery.value
             val capturing = _isCapturing.value
             val clarifyItem = _activeClarificationItem.value
             val detailItem = _activeDetailCommitment.value
             val notification = _userNotification.value
-            val commitments = repository.listForActor(actor)
-            val attention = service.review(actor, commitments)
+            val commitments = repository.listForActor(LOCAL_ACTOR_ID)
+            val attention = service.review(LOCAL_ACTOR_ID, commitments)
 
             val filtered = commitments.filter { item ->
                 val matchesQuery = query.isBlank() ||
@@ -132,13 +128,7 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
                 matchesQuery && matchesTab
             }
 
-            val authState = _uiState.value
             _uiState.value = PromisePocketUiState(
-                currentActor = actor,
-                isAmazonSignedIn = authState.isAmazonSignedIn,
-                isAmazonAuthLoading = authState.isAmazonAuthLoading,
-                amazonAccountName = authState.amazonAccountName,
-                amazonAccountEmail = authState.amazonAccountEmail,
                 filterTab = tab,
                 searchQuery = query,
                 isCapturing = capturing,
@@ -150,55 +140,6 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
                 totalPendingCount = commitments.count { it.status == CommitmentStatus.PENDING },
                 totalHonoredCount = commitments.count { it.status == CommitmentStatus.COMPLETED }
             )
-        }
-    }
-
-    fun onAmazonAuthResult(result: AmazonAuthResult) {
-        when (result) {
-            AmazonAuthResult.Loading -> {
-                _uiState.value = _uiState.value.copy(isAmazonAuthLoading = true)
-            }
-            AmazonAuthResult.Cancelled -> {
-                _userNotification.value = "Amazon sign-in canceled."
-                _uiState.value = _uiState.value.copy(isAmazonAuthLoading = false)
-                refreshData()
-            }
-            AmazonAuthResult.SignedOut -> {
-                _currentActor.value = "local-user"
-                _uiState.value = _uiState.value.copy(
-                    isAmazonSignedIn = false,
-                    isAmazonAuthLoading = false,
-                    amazonAccountName = null,
-                    amazonAccountEmail = null
-                )
-                refreshData()
-            }
-            is AmazonAuthResult.SignedIn -> {
-                _currentActor.value = result.account.actorId
-                _uiState.value = _uiState.value.copy(
-                    isAmazonSignedIn = true,
-                    isAmazonAuthLoading = false,
-                    amazonAccountName = result.account.name,
-                    amazonAccountEmail = result.account.email
-                )
-                refreshData()
-                sync()
-            }
-            is AmazonAuthResult.Error -> {
-                _userNotification.value = result.message
-                _uiState.value = _uiState.value.copy(isAmazonAuthLoading = false)
-                refreshData()
-            }
-        }
-    }
-
-    fun sync() {
-        val actor = _currentActor.value
-        if (actor == "local-user") return
-
-        viewModelScope.launch {
-            repository.syncWithCloud(actor)
-            refreshData()
         }
     }
 
@@ -224,7 +165,7 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
 
     fun openDetail(commitmentId: String) {
         viewModelScope.launch {
-            val item = repository.getCommitment(_currentActor.value, commitmentId)
+            val item = repository.getCommitment(LOCAL_ACTOR_ID, commitmentId)
             _activeDetailCommitment.value = item
             refreshData()
         }
@@ -247,7 +188,7 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
             try {
                 val parsed = parser.parseUserUtterance(rawText)
                 val commitment = service.capture(
-                    actorId = _currentActor.value,
+                    actorId = LOCAL_ACTOR_ID,
                     summary = parsed.summary,
                     rawText = rawText,
                     dueAt = parsed.dueAt,
@@ -270,7 +211,7 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
         viewModelScope.launch {
             try {
                 service.clarifyTime(
-                    actorId = _currentActor.value,
+                    actorId = LOCAL_ACTOR_ID,
                     commitmentId = activeItem.commitmentId,
                     answer = answer,
                     dueAt = resolvedDueAtIso
@@ -288,8 +229,8 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
     fun setStatus(commitmentId: String, status: CommitmentStatus) {
         viewModelScope.launch {
             try {
-                service.markStatus(_currentActor.value, commitmentId, status)
-                _activeDetailCommitment.value = repository.getCommitment(_currentActor.value, commitmentId)
+                service.markStatus(LOCAL_ACTOR_ID, commitmentId, status)
+                _activeDetailCommitment.value = repository.getCommitment(LOCAL_ACTOR_ID, commitmentId)
             } catch (e: Exception) {
                 _userNotification.value = "Error updating status: ${e.message}"
             } finally {
@@ -301,8 +242,8 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
     fun setBlockedReason(commitmentId: String, reason: String?) {
         viewModelScope.launch {
             try {
-                service.setBlockedReason(_currentActor.value, commitmentId, reason)
-                _activeDetailCommitment.value = repository.getCommitment(_currentActor.value, commitmentId)
+                service.setBlockedReason(LOCAL_ACTOR_ID, commitmentId, reason)
+                _activeDetailCommitment.value = repository.getCommitment(LOCAL_ACTOR_ID, commitmentId)
             } catch (e: Exception) {
                 _userNotification.value = "Error updating blocker: ${e.message}"
             } finally {
@@ -314,7 +255,7 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
     fun deleteCommitment(commitmentId: String) {
         viewModelScope.launch {
             try {
-                repository.deleteById(_currentActor.value, commitmentId)
+                repository.deleteById(LOCAL_ACTOR_ID, commitmentId)
                 _activeDetailCommitment.value = null
                 _userNotification.value = "Commitment deleted."
             } catch (e: Exception) {

@@ -64,9 +64,6 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
 
-    // Amazon SDK
-    implementation(files("libs/login-with-amazon-sdk.jar"))
-
     // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
