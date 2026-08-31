@@ -35,6 +35,7 @@ class PromiseEvidence(BaseModel):
     source: str = Field(min_length=1, max_length=80)
     source_id: str | None = Field(default=None, max_length=512)
     summary: str = Field(min_length=1, max_length=1000)
+    supporting_text: str | None = Field(default=None, max_length=2000)
     confidence: float = Field(ge=0.0, le=1.0)
     observed_at: datetime = Field(default_factory=utc_now)
 
