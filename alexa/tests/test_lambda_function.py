@@ -166,6 +166,24 @@ class AlexaAdapterTests(unittest.TestCase):
         )
         self.assertIn("What time", response["response"]["outputSpeech"]["text"])
 
+    def test_orphaned_clarification_recovers_as_fresh_capture_prompt(self):
+        request = event("ClarifyCommitmentIntent")
+        request["request"]["intent"]["slots"] = {
+            "answer": {"name": "answer", "value": "09:00"}
+        }
+        with patch.object(lambda_function, "_invoke") as invoke:
+            response = lambda_function.lambda_handler(request, None)
+        invoke.assert_not_called()
+        self.assertFalse(response["response"]["shouldEndSession"])
+        self.assertEqual(
+            "Promise Pocket here. What should I hold onto?",
+            response["response"]["outputSpeech"]["text"],
+        )
+        self.assertIn(
+            "promise or task",
+            response["response"]["reprompt"]["outputSpeech"]["text"],
+        )
+
     def test_unsuccessful_clarification_preserves_pending_commitment(self):
         request = event("ClarifyCommitmentIntent", new_session=False)
         request["session"]["attributes"] = {

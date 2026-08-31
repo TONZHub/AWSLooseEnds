@@ -49,7 +49,6 @@
             {"name": "answer", "type": "AMAZON.TIME"}
           ],
           "samples": [
-            "{answer}",
             "at {answer}",
             "the time is {answer}",
             "make it {answer}",
