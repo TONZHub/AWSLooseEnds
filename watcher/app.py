@@ -4,11 +4,12 @@ import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 import logging
+from pathlib import Path
 import secrets
 from secrets import compare_digest
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from agentcore_client import PocketPromiseAgentCoreClient
@@ -30,6 +31,7 @@ settings = WatcherSettings.from_environment()
 store = ConnectionStore(settings.database_path, settings.token_encryption_key)
 agentcore = PocketPromiseAgentCoreClient(settings)
 security = HTTPBasic()
+FAVICON_PATH = Path(__file__).with_name("favicon.png")
 
 
 async def scan_connection(connection: GoogleConnection) -> dict:
@@ -188,7 +190,8 @@ def receipts_wordmark() -> str:
 def receipts_page(*, title: str, body: str) -> str:
     return f"""<!doctype html><html lang="en"><head>
       <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-      <title>{title} · Receipts</title><style>{RECEIPTS_CSS}</style></head>
+      <title>{title} · Receipts</title><link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+      <style>{RECEIPTS_CSS}</style></head>
       <body><main class="stage"><i class="tape" aria-hidden="true"></i><i class="tape right" aria-hidden="true"></i>
       <article class="paper"><div class="eyebrow">the watcher is alive</div>{receipts_wordmark()}{body}
       <footer><span>DO NOT DISCARD · REF RCPT-001</span><a href="/privacy">Privacy</a><em>we have the receipts.</em></footer>
@@ -211,6 +214,11 @@ def require_admin(
 @app.get("/healthz")
 def healthz() -> dict:
     return {"ok": True, "service": "pocket-promise-watcher"}
+
+
+@app.get("/favicon.png", include_in_schema=False)
+def favicon() -> FileResponse:
+    return FileResponse(FAVICON_PATH, media_type="image/png")
 
 
 @app.get("/", response_class=HTMLResponse)
