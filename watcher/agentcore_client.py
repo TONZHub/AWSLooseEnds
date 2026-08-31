@@ -28,7 +28,8 @@ class PocketPromiseAgentCoreClient:
         digest = hashlib.sha256(
             f"{operation}:{actor_id}:{source_id}".encode("utf-8")
         ).hexdigest()
-        session_id = f"watcher-{operation}-{digest}"
+        safe_operation = operation.replace("_", "-")
+        session_id = f"watcher-{safe_operation}-{digest}"
         payload = {
             "operation": operation,
             "actor_id": actor_id,
