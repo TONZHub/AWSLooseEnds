@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from agentcore_client import PocketPromiseAgentCoreClient
+from alexa_proactive import AlexaProactiveClient
 from google_client import (
     GMAIL_SCOPES,
     build_oauth_flow,
@@ -30,6 +31,15 @@ logging.basicConfig(level=logging.INFO)
 settings = WatcherSettings.from_environment()
 store = ConnectionStore(settings.database_path, settings.token_encryption_key)
 agentcore = PocketPromiseAgentCoreClient(settings)
+alexa_proactive = (
+    AlexaProactiveClient(
+        client_id=settings.alexa_proactive_client_id,
+        client_secret=settings.alexa_proactive_client_secret,
+        endpoint=settings.alexa_proactive_endpoint,
+    )
+    if settings.proactive_notifications_enabled
+    else None
+)
 security = HTTPBasic()
 FAVICON_PATH = Path(__file__).with_name("favicon.png")
 
@@ -76,6 +86,24 @@ async def scan_connection(connection: GoogleConnection) -> dict:
         agentcore.prepare_overdue_nudges,
         actor_id=connection.actor_id,
     )
+    nudges = overdue.get("nudges") or []
+    pending_nudges = store.pending_nudges(
+        actor_id=connection.actor_id,
+        nudges=nudges,
+    )
+    notification_reference = None
+    if alexa_proactive is not None and pending_nudges:
+        commitment_ids = [item["commitment_id"] for item in pending_nudges]
+        notification_reference = await asyncio.to_thread(
+            alexa_proactive.send_overdue_alert,
+            actor_id=connection.actor_id,
+            commitment_ids=commitment_ids,
+        )
+        store.mark_nudges_sent(
+            actor_id=connection.actor_id,
+            commitment_ids=commitment_ids,
+            reference_id=notification_reference,
+        )
 
     # Only advance the cursor after every discovered message made it through
     # AgentCore. If anything raises, the overlap will retry the batch next time.
@@ -86,7 +114,9 @@ async def scan_connection(connection: GoogleConnection) -> dict:
         "candidates_seen": candidate_count,
         "likely_done_seen": likely_done_count,
         "overdue_seen": len(overdue.get("overdue_ids") or []),
-        "nudges_prepared": overdue.get("nudges") or [],
+        "nudges_prepared": nudges,
+        "nudges_pending": len(pending_nudges),
+        "notification_reference": notification_reference,
         "checked_at": scan_started.isoformat(),
     }
 
