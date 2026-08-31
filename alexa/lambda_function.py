@@ -284,9 +284,12 @@ def _clarify(event: dict[str, Any], intent: dict[str, Any]):
     if not commitment_id:
         LOGGER.warning("Alexa clarification arrived without pending commitment state")
         return _speech(
-            "I lost track of which promise you meant. Please tell me the promise again.",
+            _first_turn(
+                event,
+                "What should I hold onto?",
+            ),
             end_session=False,
-            reprompt="Tell me the promise again, including the day if you know it.",
+            reprompt="Tell me a promise or task to remember.",
         )
 
     if not answer:
