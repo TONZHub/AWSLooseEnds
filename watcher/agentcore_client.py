@@ -17,18 +17,20 @@ class PocketPromiseAgentCoreClient:
             region_name=settings.aws_region,
         )
 
-    def arbitrate_message(
+    def _invoke_source_operation(
         self,
         *,
+        operation: str,
         actor_id: str,
         source_message: dict[str, Any],
     ) -> dict[str, Any]:
         source_id = str(source_message.get("source_id") or "unknown")
-        session_id = "watcher-session-" + hashlib.sha256(
-            f"{actor_id}:{source_id}".encode("utf-8")
+        digest = hashlib.sha256(
+            f"{operation}:{actor_id}:{source_id}".encode("utf-8")
         ).hexdigest()
+        session_id = f"watcher-{operation}-{digest}"
         payload = {
-            "operation": "v2_arbitrate",
+            "operation": operation,
             "actor_id": actor_id,
             "source_message": source_message,
             "timezone": self._settings.timezone_name,
@@ -54,3 +56,27 @@ class PocketPromiseAgentCoreClient:
         if not isinstance(result, dict):
             raise ValueError("AgentCore returned a non-object response")
         return result
+
+    def arbitrate_message(
+        self,
+        *,
+        actor_id: str,
+        source_message: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._invoke_source_operation(
+            operation="v2_arbitrate",
+            actor_id=actor_id,
+            source_message=source_message,
+        )
+
+    def reconcile_message(
+        self,
+        *,
+        actor_id: str,
+        source_message: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._invoke_source_operation(
+            operation="v2_reconcile",
+            actor_id=actor_id,
+            source_message=source_message,
+        )
