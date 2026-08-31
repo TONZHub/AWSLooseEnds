@@ -14,6 +14,7 @@ from cryptography.fernet import Fernet
 
 from google_client import _message_to_source
 from agentcore_client import PocketPromiseAgentCoreClient
+from alexa_proactive import AlexaProactiveClient
 from store import ConnectionStore
 
 
@@ -66,6 +67,23 @@ class ConnectionStoreTests(unittest.TestCase):
         self.assertEqual("second@example.com", reconnected.email)
         self.assertEqual("second-refresh-token", reconnected.refresh_token)
         self.assertIsNone(reconnected.last_checked_at)
+
+    def test_proactive_nudges_are_delivered_only_once(self):
+        nudges = [
+            {"commitment_id": "promise-1", "message": "Still unresolved"},
+            {"commitment_id": "promise-2", "message": "Still unresolved"},
+        ]
+        self.assertEqual(
+            nudges, self.store.pending_nudges(actor_id="zoe", nudges=nudges)
+        )
+        self.store.mark_nudges_sent(
+            actor_id="zoe",
+            commitment_ids=["promise-1"],
+            reference_id="receipts~one",
+        )
+        self.assertEqual(
+            [nudges[1]], self.store.pending_nudges(actor_id="zoe", nudges=nudges)
+        )
 
     def test_oauth_state_is_one_time_and_preserves_pkce_verifier(self):
         self.store.save_oauth_state(
@@ -148,6 +166,35 @@ class AgentCoreClientTests(unittest.TestCase):
             json.loads(request["payload"]),
         )
         self.assertNotIn("notification", request)
+
+
+class AlexaProactiveClientTests(unittest.TestCase):
+    @patch("alexa_proactive._post")
+    def test_overdue_alert_uses_message_schema_and_multicast(self, post):
+        token_response = SimpleNamespace(
+            status=200,
+            read=lambda: json.dumps({"access_token": "token"}).encode(),
+        )
+        accepted_response = SimpleNamespace(status=202)
+        post.side_effect = [token_response, accepted_response]
+        client = AlexaProactiveClient(
+            client_id="client",
+            client_secret="secret",
+            endpoint="https://example.test/development",
+        )
+
+        reference = client.send_overdue_alert(
+            actor_id="zoe", commitment_ids=["promise-1", "promise-2"]
+        )
+
+        self.assertTrue(reference.startswith("receipts~"))
+        event_call = post.call_args_list[1]
+        payload = json.loads(event_call.kwargs["body"])
+        self.assertEqual("AMAZON.MessageAlert.Activated", payload["event"]["name"])
+        self.assertEqual(2, payload["event"]["payload"]["messageGroup"]["count"])
+        self.assertEqual(
+            {"type": "Multicast", "payload": {}}, payload["relevantAudience"]
+        )
 
 
 if __name__ == "__main__":

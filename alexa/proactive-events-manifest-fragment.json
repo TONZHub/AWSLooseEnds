@@ -1,0 +1,29 @@
+{
+  "permissions": [
+    {
+      "name": "alexa::devices:all:notifications:write"
+    }
+  ],
+  "events": {
+    "publications": [
+      {
+        "eventName": "AMAZON.MessageAlert.Activated"
+      }
+    ],
+    "subscriptions": [
+      {
+        "eventName": "SKILL_PROACTIVE_SUBSCRIPTION_CHANGED"
+      }
+    ],
+    "endpoint": {
+      "uri": "arn:aws:lambda:us-east-1:568608118800:function:loose-ends-alexa-adapter"
+    },
+    "regions": {
+      "NA": {
+        "endpoint": {
+          "uri": "arn:aws:lambda:us-east-1:568608118800:function:loose-ends-alexa-adapter"
+        }
+      }
+    }
+  }
+}
