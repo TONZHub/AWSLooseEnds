@@ -1,6 +1,6 @@
 """Pocket Promise v2: durable lifecycle for detected human commitments.
 
-This module intentionally does not know about Gmail, Alexa, Render, or Nova.
+This module intentionally does not know about Gmail, Alexa, Render, or a model provider.
 Adapters may create candidate records and attach evidence; only explicit user
 confirmation promotes a candidate into an active promise.
 """
