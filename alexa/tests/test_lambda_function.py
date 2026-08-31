@@ -54,10 +54,37 @@ def event(intent_name=None, commitment=None, *, new_session=True):
 
 
 class AlexaAdapterTests(unittest.TestCase):
+    def test_interaction_model_includes_natural_core_phrases(self):
+        model_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "interaction-model.json"
+        )
+        with open(model_path, encoding="utf-8") as model_file:
+            intents = {
+                intent["name"]: set(intent.get("samples", []))
+                for intent in json.load(model_file)["interactionModel"]["languageModel"][
+                    "intents"
+                ]
+            }
+
+        expected = {
+            "CaptureCommitmentIntent": {"track {commitment}", "add {commitment}"},
+            "LinkAlexaIntent": {"my code is {code}", "use code {code}"},
+            "ReviewPromisePocketIntent": {
+                "review my promises",
+                "check my commitments",
+                "what needs my attention",
+                "review my receipts",
+            },
+            "CompleteReviewedPromiseIntent": {"complete it", "close it"},
+            "KeepPromiseOpenIntent": {"leave it open", "keep tracking it"},
+        }
+        for intent_name, samples in expected.items():
+            self.assertTrue(samples.issubset(intents[intent_name]))
+
     def test_launch_invites_capture(self):
         response = lambda_function.lambda_handler(event(), None)
         self.assertFalse(response["response"]["shouldEndSession"])
-        self.assertIn("Promise Pocket is listening", response["response"]["outputSpeech"]["text"])
+        self.assertIn("Receipts is listening", response["response"]["outputSpeech"]["text"])
 
     def test_wrong_skill_is_rejected_without_invoking_runtime(self):
         request = event("CaptureCommitmentIntent", "call Mom")
@@ -81,7 +108,7 @@ class AlexaAdapterTests(unittest.TestCase):
         self.assertEqual("call Mom tomorrow", invoke.call_args.args[1]["prompt"])
         self.assertTrue(
             response["response"]["outputSpeech"]["text"].startswith(
-                "Promise Pocket here."
+                "Receipts here."
             )
         )
         self.assertIn("tucked", response["response"]["outputSpeech"]["text"])
@@ -109,7 +136,7 @@ class AlexaAdapterTests(unittest.TestCase):
         response = lambda_function.lambda_handler(event("UnknownIntent"), None)
         self.assertTrue(
             response["response"]["outputSpeech"]["text"].startswith(
-                "Promise Pocket here."
+                "Receipts here."
             )
         )
 
@@ -176,7 +203,7 @@ class AlexaAdapterTests(unittest.TestCase):
         invoke.assert_not_called()
         self.assertFalse(response["response"]["shouldEndSession"])
         self.assertEqual(
-            "Promise Pocket here. What should I hold onto?",
+            "Receipts here. What should I hold onto?",
             response["response"]["outputSpeech"]["text"],
         )
         self.assertIn(
@@ -211,7 +238,7 @@ class AlexaAdapterTests(unittest.TestCase):
             )
         self.assertEqual("v2_review", invoke.call_args.args[1]["operation"])
         self.assertEqual(
-            "Promise Pocket here. Nothing needs you right now.",
+            "Receipts here. Nothing needs you right now.",
             response["response"]["outputSpeech"]["text"],
         )
 

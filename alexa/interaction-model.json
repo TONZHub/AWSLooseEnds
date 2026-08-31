@@ -1,7 +1,7 @@
 {
   "interactionModel": {
     "languageModel": {
-      "invocationName": "promise pocket",
+      "invocationName": "receipts",
       "intents": [
         {
           "name": "CaptureCommitmentIntent",
@@ -22,6 +22,11 @@
             "can you hold me on {commitment}",
             "hold me on {commitment}",
             "don't let me forget to {commitment}",
+            "add a promise to {commitment}",
+            "add {commitment}",
+            "track {commitment}",
+            "track that {commitment}",
+            "make a note that {commitment}",
             "save {commitment}",
             "write down {commitment}",
             "keep track of {commitment}"
@@ -39,6 +44,11 @@
             "connect code {code}",
             "pair {code}",
             "pair code {code}",
+            "use code {code}",
+            "my code is {code}",
+            "the code is {code}",
+            "connect me with code {code}",
+            "pair me with code {code}",
             "link my account with {code}",
             "connect my account with {code}"
           ]
@@ -61,6 +71,17 @@
           "samples": [
             "what needs me",
             "what do I need to do",
+            "what needs my attention",
+            "what promises need me",
+            "do any promises need me",
+            "review my promises",
+            "review my commitments",
+            "check my promises",
+            "check my commitments",
+            "review my receipts",
+            "check my receipts",
+            "review my pocket promise",
+            "check my pocket promise",
             "review my promise pocket",
             "check my promise pocket"
           ]
@@ -70,6 +91,10 @@
           "slots": [],
           "samples": [
             "I finished it",
+            "I completed it",
+            "it's finished",
+            "complete it",
+            "close it",
             "that's done",
             "mark it done",
             "yes I did it",
@@ -81,6 +106,11 @@
           "slots": [],
           "samples": [
             "not yet",
+            "leave it open",
+            "keep tracking it",
+            "I still need to do it",
+            "I haven't done it",
+            "no keep it open",
             "keep it open",
             "I'm still working on it",
             "no I haven't"

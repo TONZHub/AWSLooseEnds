@@ -71,10 +71,10 @@ fun CommitmentCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(2.dp))
             .clickable(onClick = onClick)
             .testTag("commitment_card_${commitment.commitmentId}"),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(2.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isCompleted || isCanceled) {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -83,11 +83,11 @@ fun CommitmentCard(
             }
         ),
         border = BorderStroke(
-            1.dp,
+            2.dp,
             if (isCompleted) Slate200 else MaterialTheme.colorScheme.outlineVariant
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isCompleted || isCanceled) 0.dp else 1.5.dp
+            defaultElevation = if (isCompleted || isCanceled) 0.dp else 7.dp
         )
     ) {
         Row(

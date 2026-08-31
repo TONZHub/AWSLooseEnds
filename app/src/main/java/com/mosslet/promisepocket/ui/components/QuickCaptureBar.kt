@@ -64,10 +64,10 @@ fun QuickCaptureBar(
 
     Column(modifier = modifier.fillMaxWidth()) {
         Surface(
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(2.dp),
             color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 4.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            shadowElevation = 8.dp,
+            border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -93,7 +93,7 @@ fun QuickCaptureBar(
                     onValueChange = { text = it },
                     placeholder = {
                         Text(
-                            "I promised...",
+                            "STATE YOUR PROMISE...",
                             fontSize = 14.sp,
                             maxLines = 1
                         )

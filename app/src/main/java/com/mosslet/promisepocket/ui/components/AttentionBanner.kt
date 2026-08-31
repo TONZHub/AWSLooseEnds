@@ -139,12 +139,12 @@ fun AttentionCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(2.dp))
             .clickable(onClick = onClick)
             .testTag("attention_card_${item.commitmentId}"),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(2.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 9.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -153,7 +153,7 @@ fun AttentionCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(0.dp),
                     color = bgColor
                 ) {
                     Row(

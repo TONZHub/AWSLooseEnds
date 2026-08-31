@@ -2,25 +2,24 @@ package com.mosslet.promisepocket.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Promise Pocket neutrals: deep blue-black surfaces with soft, low-contrast edges.
-val Slate900 = Color(0xFF0B1728)
-val Slate800 = Color(0xFF1A2638)
-val Slate700 = Color(0xFF2B394E)
-val Slate600 = Color(0xFF536178)
-val Slate500 = Color(0xFF718096)
-val Slate400 = Color(0xFFA6B0C0)
-val Slate200 = Color(0xFFD7DDE7)
-val Slate100 = Color(0xFFEEF1F5)
-val Slate50 = Color(0xFFFAF8F9)
+// Receipts: black ink, evidence paper, warning red, and highlighter yellow.
+val Slate900 = Color(0xFF080806)
+val Slate800 = Color(0xFF151411)
+val Slate700 = Color(0xFF28251F)
+val Slate600 = Color(0xFF5C564A)
+val Slate500 = Color(0xFF7A7262)
+val Slate400 = Color(0xFF9D9481)
+val Slate200 = Color(0xFFD1C6A9)
+val Slate100 = Color(0xFFE2D8BD)
+val Slate50 = Color(0xFFEEE6CE)
 
-// Brand palette pulled from the real pinky-promise icon.
-val PromisePink = Color(0xFFE66D83)
-val PromisePinkDark = Color(0xFFB44560)
-val PromiseBlush = Color(0xFFFFC5C8)
-val PromisePeach = Color(0xFFFFD8C7)
-val PromiseCream = Color(0xFFFFEEE7)
-val PromiseBerry = Color(0xFF7B3049)
-val PromiseMauve = Color(0xFF8F7180)
+val PromisePink = Color(0xFFB62922)
+val PromisePinkDark = Color(0xFF761713)
+val PromiseBlush = Color(0xFFE7B0A0)
+val PromisePeach = Color(0xFFF2D83D)
+val PromiseCream = Color(0xFFEEE6CE)
+val PromiseBerry = Color(0xFF8E201A)
+val PromiseMauve = Color(0xFF6D6557)
 
 // Compatibility aliases used throughout the existing UI.
 val SandGold = PromisePink
@@ -33,8 +32,8 @@ val CoralDueBg = PromiseBlush
 val AmberClarify = PromiseBerry
 val AmberClarifyBg = PromiseBlush
 
-val IndigoBlocked = Color(0xFF9677A4)
-val IndigoBlockedBg = Color(0xFFE8DDF0)
+val IndigoBlocked = Color(0xFF302D28)
+val IndigoBlockedBg = Color(0xFFC9BFA4)
 
-val GreenSuccess = Color(0xFF76A88A)
-val GreenSuccessBg = Color(0xFFDDEDE3)
+val GreenSuccess = Color(0xFF375E42)
+val GreenSuccessBg = Color(0xFFBFD0B9)
