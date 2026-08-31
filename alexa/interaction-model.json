@@ -50,6 +50,29 @@
             "check my promise pocket"
           ]
         },
+        {
+          "name": "CompleteReviewedPromiseIntent",
+          "slots": [],
+          "samples": [
+            "I finished it",
+            "that's done",
+            "mark it done",
+            "yes I did it",
+            "I did it"
+          ]
+        },
+        {
+          "name": "KeepPromiseOpenIntent",
+          "slots": [],
+          "samples": [
+            "not yet",
+            "keep it open",
+            "I'm still working on it",
+            "no I haven't"
+          ]
+        },
+        {"name": "AMAZON.YesIntent", "samples": []},
+        {"name": "AMAZON.NoIntent", "samples": []},
         {"name": "AMAZON.CancelIntent", "samples": []},
         {"name": "AMAZON.HelpIntent", "samples": []},
         {"name": "AMAZON.StopIntent", "samples": []},
