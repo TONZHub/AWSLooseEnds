@@ -17,6 +17,9 @@ class WatcherSettings:
     aws_region: str | None
     timezone_name: str
     poll_interval_seconds: int
+    alexa_proactive_client_id: str
+    alexa_proactive_client_secret: str
+    alexa_proactive_endpoint: str
 
     @classmethod
     def from_environment(cls) -> "WatcherSettings":
@@ -38,6 +41,12 @@ class WatcherSettings:
             aws_region=os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION"),
             timezone_name=os.getenv("POCKET_PROMISE_TIMEZONE", "America/New_York"),
             poll_interval_seconds=poll_interval,
+            alexa_proactive_client_id=os.getenv("ALEXA_PROACTIVE_CLIENT_ID", ""),
+            alexa_proactive_client_secret=os.getenv("ALEXA_PROACTIVE_CLIENT_SECRET", ""),
+            alexa_proactive_endpoint=os.getenv(
+                "ALEXA_PROACTIVE_ENDPOINT",
+                "https://api.amazonalexa.com/v1/proactiveEvents/stages/development",
+            ),
         )
         settings.validate()
         return settings
@@ -57,3 +66,18 @@ class WatcherSettings:
             raise RuntimeError(
                 "Missing required watcher settings: " + ", ".join(sorted(missing))
             )
+        proactive_values = (
+            self.alexa_proactive_client_id,
+            self.alexa_proactive_client_secret,
+        )
+        if any(proactive_values) and not all(proactive_values):
+            raise RuntimeError(
+                "ALEXA_PROACTIVE_CLIENT_ID and ALEXA_PROACTIVE_CLIENT_SECRET "
+                "must be configured together"
+            )
+
+    @property
+    def proactive_notifications_enabled(self) -> bool:
+        return bool(
+            self.alexa_proactive_client_id and self.alexa_proactive_client_secret
+        )

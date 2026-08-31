@@ -329,6 +329,9 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         _verify_skill(event)
         request = event.get("request", {})
         request_type = request.get("type")
+        if request_type == "AlexaSkillEvent.ProactiveSubscriptionChanged":
+            # Multicast events do not require retaining Alexa's raw user ID.
+            return {"version": "1.0", "response": {}}
         if request_type == "LaunchRequest":
             return _speech(
                 "Receipts is listening. What should I hold onto?",

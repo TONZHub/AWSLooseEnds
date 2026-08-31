@@ -66,6 +66,17 @@ class ConnectionStore:
             }
             if "code_verifier" not in columns:
                 db.execute("ALTER TABLE oauth_states ADD COLUMN code_verifier TEXT")
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS proactive_notifications (
+                    actor_id TEXT NOT NULL,
+                    commitment_id TEXT NOT NULL,
+                    reference_id TEXT NOT NULL,
+                    sent_at TEXT NOT NULL,
+                    PRIMARY KEY(actor_id, commitment_id)
+                )
+                """
+            )
 
     def save_oauth_state(
         self,
@@ -149,6 +160,48 @@ class ConnectionStore:
             db.execute(
                 "UPDATE google_connections SET last_checked_at = ?, updated_at = ? WHERE actor_id = ?",
                 (checked_at.isoformat(), datetime.now(timezone.utc).isoformat(), actor_id),
+            )
+
+    def pending_nudges(
+        self, *, actor_id: str, nudges: list[dict[str, str]]
+    ) -> list[dict[str, str]]:
+        valid_ids = [
+            item["commitment_id"]
+            for item in nudges
+            if isinstance(item.get("commitment_id"), str)
+            and item["commitment_id"]
+        ]
+        if not valid_ids:
+            return []
+        placeholders = ",".join("?" for _ in valid_ids)
+        with closing(self._connect()) as db:
+            sent = {
+                str(row[0])
+                for row in db.execute(
+                    f"""SELECT commitment_id FROM proactive_notifications
+                    WHERE actor_id = ? AND commitment_id IN ({placeholders})""",
+                    (actor_id, *valid_ids),
+                )
+            }
+        return [item for item in nudges if item.get("commitment_id") not in sent]
+
+    def mark_nudges_sent(
+        self,
+        *,
+        actor_id: str,
+        commitment_ids: list[str],
+        reference_id: str,
+    ) -> None:
+        sent_at = datetime.now(timezone.utc).isoformat()
+        with closing(self._connect()) as db, db:
+            db.executemany(
+                """INSERT OR IGNORE INTO proactive_notifications(
+                    actor_id, commitment_id, reference_id, sent_at
+                ) VALUES(?, ?, ?, ?)""",
+                [
+                    (actor_id, commitment_id, reference_id, sent_at)
+                    for commitment_id in commitment_ids
+                ],
             )
 
     def public_status(self) -> list[dict[str, str | None]]:

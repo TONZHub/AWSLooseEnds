@@ -86,6 +86,22 @@ class AlexaAdapterTests(unittest.TestCase):
         self.assertFalse(response["response"]["shouldEndSession"])
         self.assertIn("Receipts is listening", response["response"]["outputSpeech"]["text"])
 
+    def test_proactive_subscription_change_is_acknowledged_silently(self):
+        request = event()
+        request["request"] = {
+            "type": "AlexaSkillEvent.ProactiveSubscriptionChanged",
+            "requestId": "subscription-123",
+            "body": {
+                "subscriptions": [
+                    {"eventName": "AMAZON.MessageAlert.Activated"}
+                ]
+            },
+        }
+
+        response = lambda_function.lambda_handler(request, None)
+
+        self.assertEqual({"version": "1.0", "response": {}}, response)
+
     def test_wrong_skill_is_rejected_without_invoking_runtime(self):
         request = event("CaptureCommitmentIntent", "call Mom")
         request["context"]["System"]["application"]["applicationId"] = "wrong"

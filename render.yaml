@@ -30,6 +30,12 @@ services:
         sync: false
       - key: WATCHER_ADMIN_KEY
         sync: false
+      - key: ALEXA_PROACTIVE_CLIENT_ID
+        sync: false
+      - key: ALEXA_PROACTIVE_CLIENT_SECRET
+        sync: false
+      - key: ALEXA_PROACTIVE_ENDPOINT
+        value: https://api.amazonalexa.com/v1/proactiveEvents/stages/development
       - key: AGENT_RUNTIME_ARN
         sync: false
       - key: AWS_REGION
