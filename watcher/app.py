@@ -7,8 +7,9 @@ import logging
 from pathlib import Path
 import secrets
 from secrets import compare_digest
+from urllib.parse import parse_qs
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
@@ -200,6 +201,19 @@ RECEIPTS_CSS = """
   .action:hover,.action:focus-visible { transform:translate(-2px,-3px) rotate(-.4deg); box-shadow:8px 10px 0 var(--red); outline:none; }
   .action strong { display:block; margin-bottom:10px; text-transform:uppercase; letter-spacing:.08em; }
   .action small { color:#544e43; line-height:1.45; }
+  .source-auth { margin:32px 0; padding:24px; border:2px solid #111; background:#f5efdd;
+    box-shadow:7px 8px 0 var(--red); }
+  .source-auth label { display:block; margin-bottom:9px; text-transform:uppercase; letter-spacing:.12em; font-weight:700; }
+  .source-auth input { width:100%; padding:13px 14px; color:#111; background:#fffdf5; border:2px solid #111;
+    border-radius:0; font:1rem "Courier New",monospace; }
+  .source-auth input:focus-visible { outline:3px solid var(--yellow); outline-offset:2px; }
+  .source-auth .meta { display:block; margin:9px 0 18px; }
+  .google-button { display:flex; align-items:center; justify-content:center; gap:12px; width:100%; min-height:48px;
+    padding:10px 16px; color:#202124; background:#fff; border:1px solid #747775; border-radius:4px;
+    box-shadow:2px 3px 0 #111; font:600 .95rem Arial,sans-serif; cursor:pointer; }
+  .google-button:hover,.google-button:focus-visible { background:#f8faff; outline:3px solid var(--yellow); outline-offset:2px; }
+  .google-button img { width:20px; height:20px; }
+  .auth-error { margin:0 0 16px; padding:10px 12px; color:#f5ebd4; background:var(--red); font-weight:700; }
   .code { margin:24px 0; padding:18px; text-align:center; background:#111; color:var(--paper); border-left:7px solid var(--red); }
   .code strong { display:block; color:var(--yellow); font:700 clamp(2.5rem,10vw,5.5rem)/1 "Courier New",monospace; letter-spacing:.24em; }
   .meta { color:var(--muted); font-size:.78rem; line-height:1.6; overflow-wrap:anywhere; }
@@ -268,7 +282,7 @@ def home() -> str:
           <section class="evidence"><div class="stamp">intercepted · awaiting statement</div>
           <p>“I said I would do it. Receipts remembers the part that matters.”</p></section>
           <nav class="actions" aria-label="Receipts actions">
-            <a class="action" href="/auth/google/start"><strong>Connect Gmail</strong><small>Watch authorized sent mail for commitments and evidence of follow-through.</small></a>
+            <a class="action" href="/connect/google"><strong>Connect Gmail</strong><small>Watch authorized sent mail for commitments and evidence of follow-through.</small></a>
             <a class="action" href="/alexa/pair"><strong>Pair Alexa</strong><small>Generate a short-lived code. No Login with Amazon required.</small></a>
             <a class="action" href="/status"><strong>Watcher status</strong><small>Inspect connected sources and the last completed scan.</small></a>
           </nav>
@@ -303,8 +317,37 @@ def alexa_pair() -> str:
     )
 
 
-@app.get("/auth/google/start", dependencies=[Depends(require_admin)])
-def google_auth_start() -> RedirectResponse:
+def google_connect_page(*, invalid_key: bool = False) -> str:
+    error_html = (
+        '<p class="auth-error" role="alert">That access key did not match the ledger.</p>'
+        if invalid_key
+        else ""
+    )
+    return receipts_page(
+        title="Connect Gmail",
+        body=f"""
+          <p class="lede">Authorize a new <span class="highlight">SOURCE.</span>
+          Receipts will inspect authorized sent mail for promises and evidence of follow-through.</p>
+          <section class="evidence"><div class="stamp">chain of custody</div>
+          <p>Read-only Gmail access. Full messages are inspected in transit and are not stored by the watcher.</p></section>
+          <form class="source-auth" method="post" action="/connect/google">
+            {error_html}
+            <label for="access-key">Evidence desk access key</label>
+            <input id="access-key" name="access_key" type="password" required
+              autocomplete="current-password" aria-describedby="access-key-note">
+            <small class="meta" id="access-key-note">This protects the configured demo ledger before Google authorization begins.</small>
+            <button class="google-button" type="submit">
+              <img src="https://developers.google.com/identity/images/g-logo.png" alt="" referrerpolicy="no-referrer">
+              Continue with Google
+            </button>
+          </form>
+          <p class="meta">The next screen belongs to Google, so its account chooser cannot wear the Receipts theme.
+          You will return here with a connection receipt when authorization finishes.</p>
+        """,
+    )
+
+
+def begin_google_authorization() -> RedirectResponse:
     state = secrets.token_urlsafe(32)
     code_verifier = secrets.token_urlsafe(64)
     store.save_oauth_state(
@@ -326,16 +369,50 @@ def google_auth_start() -> RedirectResponse:
     return RedirectResponse(authorization_url)
 
 
+@app.get("/connect/google", response_class=HTMLResponse)
+def google_connect() -> str:
+    return google_connect_page()
+
+
+@app.post("/connect/google", response_class=HTMLResponse)
+async def google_connect_submit(request: Request) -> HTMLResponse | RedirectResponse:
+    body = await request.body()
+    values = parse_qs(body[:4096].decode("utf-8", errors="replace"), keep_blank_values=True)
+    access_key = str((values.get("access_key") or [""])[0])
+    if not compare_digest(access_key, settings.admin_key):
+        return HTMLResponse(google_connect_page(invalid_key=True), status_code=401)
+    return begin_google_authorization()
+
+
+@app.get("/auth/google/start", dependencies=[Depends(require_admin)])
+def google_auth_start() -> RedirectResponse:
+    return begin_google_authorization()
+
+
 @app.get("/auth/google/callback", response_class=HTMLResponse)
 def google_auth_callback(
     state: str = Query(...),
-    code: str = Query(...),
+    code: str | None = Query(None),
+    error: str | None = Query(None),
 ) -> str:
-    # The callback is protected by the high-entropy, single-use OAuth state that
-    # could only be created by the admin-protected start route.
+    # The callback is protected by high-entropy, single-use OAuth state plus PKCE.
     oauth_context = store.consume_oauth_state(state)
     if oauth_context is None:
         raise HTTPException(status_code=400, detail="invalid or expired OAuth state")
+    if error:
+        return receipts_page(
+            title="Google connection canceled",
+            body="""
+              <p class="lede"><span class="highlight">NO SOURCE ADDED.</span>
+              Google authorization was canceled. The ledger remains unchanged.</p>
+              <nav class="actions" aria-label="Connection actions">
+                <a class="action" href="/connect/google"><strong>Try again</strong><small>Return to the source authorization desk.</small></a>
+                <a class="action" href="/"><strong>Return to Receipts</strong><small>Back to the evidence ledger.</small></a>
+              </nav>
+            """,
+        )
+    if not code:
+        raise HTTPException(status_code=400, detail="Google returned no authorization code")
 
     flow = build_oauth_flow(
         settings,
