@@ -205,7 +205,14 @@ RECEIPTS_CSS = """
   .meta { color:var(--muted); font-size:.78rem; line-height:1.6; overflow-wrap:anywhere; }
   footer { display:flex; justify-content:space-between; gap:20px; margin-top:42px; padding-top:18px; border-top:1px solid #918875; color:var(--muted); font-size:.72rem; }
   footer a { text-decoration-thickness:2px; }
-  @media (max-width:600px) { .paper { padding:40px 22px 32px; } .wordmark { margin-top:24px; } footer { flex-direction:column; } }
+  @media (max-width:600px) {
+    .paper { padding:40px 22px 32px; }
+    .wordmark { margin-top:24px; }
+    footer { flex-direction:column; }
+  }
+  @media (max-width:450px) {
+    .wordmark { flex-wrap:nowrap; gap:1px; font-size:clamp(1.8rem,10vw,2.8rem); }
+  }
   @media (prefers-reduced-motion:reduce) { * { animation:none!important; transition:none!important; } }
 """
 
