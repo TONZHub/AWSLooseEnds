@@ -323,6 +323,23 @@ class WatcherAppAuthTests(unittest.TestCase):
         self.assertEqual(200, resp.status_code)
         self.assertIn('<a href="/admin" class="cut admin-link"', resp.text)
 
+    def test_connect_google_endpoints(self):
+        resp = self.client.get("/connect/google")
+        self.assertEqual(200, resp.status_code)
+        self.assertIn("Connect Gmail", resp.text)
+
+        with patch.object(self.watcher_app, "begin_google_authorization") as begin_auth:
+            from fastapi.responses import RedirectResponse
+            begin_auth.return_value = RedirectResponse("https://accounts.google.com/test", status_code=303)
+
+            # Test POST /connect/google
+            post_resp = self.client.post("/connect/google", data={}, follow_redirects=False)
+            self.assertIn(post_resp.status_code, (302, 303, 307))
+
+            # Test GET /auth/google/start
+            start_resp = self.client.get("/auth/google/start", follow_redirects=False)
+            self.assertIn(start_resp.status_code, (302, 303, 307))
+
 
 if __name__ == "__main__":
     unittest.main()
