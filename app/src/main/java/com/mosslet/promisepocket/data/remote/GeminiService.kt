@@ -94,13 +94,4 @@ object RetrofitClient {
             .build()
         retrofit.create(GeminiApiService::class.java)
     }
-
-    val backendService: CommitmentApiService by lazy {
-        val retrofit = Retrofit.Builder()
-            .baseUrl("https://api.promisepocket.com/") // TODO: Replace with actual backend URL
-            .client(okHttpClient)
-            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-            .build()
-        retrofit.create(CommitmentApiService::class.java)
-    }
 }

@@ -9,8 +9,6 @@ import com.mosslet.promisepocket.data.remote.MobileLinkRequest
 import com.mosslet.promisepocket.data.remote.MobileLinkResponse
 import com.mosslet.promisepocket.data.remote.MobileSessionStore
 import com.mosslet.promisepocket.data.remote.ReceiptsMobileClient
-import com.mosslet.promisepocket.data.remote.RetrofitClient
-import com.mosslet.promisepocket.data.remote.SyncRequest
 import com.mosslet.promisepocket.data.remote.SyncResponse
 import kotlinx.coroutines.flow.Flow
 
@@ -103,7 +101,7 @@ class CommitmentRepository(
     }
 
     suspend fun syncWithCloud(actorId: String = currentActorId) {
-        // If linked to Receipts watcher, use the mobile client API
+        // When linked to Receipts watcher, sync with the shared ledger
         if (mobileClient != null && sessionStore?.isLinked == true) {
             try {
                 val response = mobileClient.service.listCommitments()
@@ -116,32 +114,9 @@ class CommitmentRepository(
                         dao.update(entity)
                     }
                 }
-                return
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        }
-
-        // Legacy fallback
-        if (actorId == "local-user") return
-
-        try {
-            val response = RetrofitClient.backendService.invokeOperation(
-                SyncRequest(operation = "review", actor_id = actorId)
-            )
-
-            response.items?.forEach { remote ->
-                val local = dao.getById(actorId, remote.commitment_id)
-                if (local == null) {
-                    dao.insert(CommitmentRemoteMapper.toEntity(remote))
-                } else {
-                    // Simple sync logic: remote wins for now
-                    dao.update(CommitmentRemoteMapper.toEntity(remote))
-                }
-            }
-        } catch (e: Exception) {
-            // Log error or handle gracefully
-            e.printStackTrace()
         }
     }
 }
