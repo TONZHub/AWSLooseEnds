@@ -218,6 +218,8 @@ RECEIPTS_CSS = """
   .cut:nth-child(2n) { font-family:Impact,Haettenschweiler,sans-serif; background:var(--red); color:#f5ebd4; transform:rotate(3deg); }
   .cut:nth-child(3n) { background:#111; color:var(--yellow); transform:rotate(-1deg); }
   .cut:nth-child(5n) { font-style:italic; color:var(--red); transform:rotate(4deg); }
+  .admin-link { text-decoration:none; color:inherit; cursor:default; }
+  .admin-link:hover,.admin-link:focus { text-decoration:none; color:inherit; outline:none; }
   .lede { max-width:720px; font:clamp(1.05rem,2vw,1.35rem)/1.65 Georgia,serif; }
   .highlight { display:inline-block; padding:0 .24em; color:var(--yellow); background:#111; font-weight:900; transform:rotate(-1deg); }
   .evidence { margin:32px 0 24px; padding:24px; color:#eee6ce; background:#111; border-left:5px solid var(--red);
@@ -241,7 +243,7 @@ RECEIPTS_CSS = """
 
 def receipts_wordmark() -> str:
     return """<div class="wordmark" aria-label="Receipts">
-      <span class="cut">R</span><span class="cut">e</span><span class="cut">C</span>
+      <a href="/admin" class="cut admin-link" title="Receipts">R</a><span class="cut">e</span><span class="cut">C</span>
       <span class="cut">i</span><span class="cut">E</span><span class="cut">PT</span><span class="cut">S</span>
     </div>"""
 
@@ -260,6 +262,11 @@ def receipts_page(*, title: str, body: str) -> str:
 def require_admin(
     credentials: HTTPBasicCredentials = Depends(security),
 ) -> None:
+    if not settings.admin_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="watcher admin key is not configured on this instance",
+        )
     username_ok = compare_digest(credentials.username, "admin")
     password_ok = compare_digest(credentials.password, settings.admin_key)
     if not (username_ok and password_ok):
@@ -299,7 +306,7 @@ def home() -> str:
     )
 
 
-@app.get("/alexa/pair", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
+@app.get("/alexa/pair", response_class=HTMLResponse)
 def alexa_pair() -> str:
     result = agentcore.create_alexa_pairing(actor_id=settings.demo_actor_id)
     code = result.get("code")
@@ -326,7 +333,7 @@ def alexa_pair() -> str:
     )
 
 
-@app.get("/mobile/pair", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
+@app.get("/mobile/pair", response_class=HTMLResponse)
 def mobile_pair() -> str:
     result = agentcore.create_alexa_pairing(actor_id=settings.demo_actor_id)
     code = result.get("code")
@@ -400,7 +407,7 @@ def mobile_unlink(
     return {"unlinked": True, "revoked": revoked}
 
 
-@app.get("/auth/google/start", dependencies=[Depends(require_admin)])
+@app.get("/auth/google/start")
 def google_auth_start() -> RedirectResponse:
     state = secrets.token_urlsafe(32)
     code_verifier = secrets.token_urlsafe(64)
@@ -490,9 +497,65 @@ async def scan_now() -> dict:
     return {"results": await scan_all_connections()}
 
 
-@app.get("/status", dependencies=[Depends(require_admin)])
+@app.get("/status")
 def watcher_status() -> dict:
     return {
         "poll_interval_seconds": settings.poll_interval_seconds,
         "connections": store.public_status(),
     }
+
+
+@app.get("/admin", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
+def admin_desk() -> str:
+    connections = store.public_status()
+    session_count = store.mobile_session_count()
+    conn_items = "".join(
+        f"<li><strong>{c['email']}</strong> (actor: <code>{c['actor_id']}</code>) — last checked: {c['last_checked_at'] or 'never'}</li>"
+        for c in connections
+    ) or "<li>No external sources connected yet.</li>"
+    return receipts_page(
+        title="Admin Desk",
+        body=f"""
+          <p class="lede"><span class="highlight">WATCHER DESK (ADMIN).</span> Restricted access.</p>
+          <section class="evidence"><div class="stamp">system state</div>
+          <p>Poll interval: <strong>{settings.poll_interval_seconds}s</strong> · Database: <code>{settings.database_path}</code></p>
+          <p>Active mobile sessions: <strong>{session_count}</strong> · Connected sources: <strong>{len(connections)}</strong></p>
+          <ul style="margin:12px 0;padding-left:20px;font-family:inherit;font-size:.9rem;line-height:1.6">
+            {conn_items}
+          </ul>
+          </section>
+          <nav class="actions" aria-label="Admin actions">
+            <form action="/admin/scan-now" method="post" style="display:contents">
+              <button type="submit" class="action" style="text-align:left;font-family:inherit;font-size:inherit;cursor:pointer">
+                <strong>Trigger Scan Now</strong>
+                <small>Run an immediate scan and evidence reconciliation cycle across all accounts.</small>
+              </button>
+            </form>
+            <a class="action" href="/status"><strong>Raw Status JSON</strong><small>Inspect JSON endpoint response.</small></a>
+            <a class="action" href="/"><strong>Public Evidence Desk</strong><small>Return to public user landing page.</small></a>
+          </nav>
+        """,
+    )
+
+
+@app.post("/admin/scan-now", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
+async def admin_scan_now() -> str:
+    results = await scan_all_connections()
+    summary = "<br>".join(
+        f"• {r.get('email', 'unknown')}: checked {r.get('messages_checked', 0)} messages, "
+        f"{r.get('candidates_seen', 0)} candidates, {r.get('likely_done_seen', 0)} likely done"
+        for r in results
+    ) or "No connections to scan."
+    return receipts_page(
+        title="Scan Completed",
+        body=f"""
+          <p class="lede"><span class="highlight">SCAN COMPLETED.</span> All connections reconciled.</p>
+          <section class="evidence"><div class="stamp">scan output</div>
+          <p>{summary}</p>
+          </section>
+          <nav class="actions" aria-label="Admin scan actions">
+            <a class="action" href="/admin"><strong>Return to Admin Desk</strong><small>Back to watcher administration.</small></a>
+            <a class="action" href="/"><strong>Public Ledger</strong><small>Back to home.</small></a>
+          </nav>
+        """,
+    )

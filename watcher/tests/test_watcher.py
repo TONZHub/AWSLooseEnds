@@ -105,6 +105,19 @@ class ConnectionStoreTests(unittest.TestCase):
         self.assertIsNone(self.store.mobile_actor_for_token(token))
         self.assertFalse(self.store.revoke_mobile_session(token))
 
+    def test_mobile_session_count(self):
+        self.assertEqual(0, self.store.mobile_session_count())
+        self.store.issue_mobile_session(
+            installation_id="install-1",
+            actor_id="mobile-1",
+        )
+        self.assertEqual(1, self.store.mobile_session_count())
+        self.store.issue_mobile_session(
+            installation_id="install-2",
+            actor_id="mobile-2",
+        )
+        self.assertEqual(2, self.store.mobile_session_count())
+
     def test_oauth_state_is_one_time_and_preserves_pkce_verifier(self):
         self.store.save_oauth_state(
             state="good-state",
@@ -238,6 +251,77 @@ class AlexaProactiveClientTests(unittest.TestCase):
         self.assertEqual(
             {"type": "Multicast", "payload": {}}, payload["relevantAudience"]
         )
+
+
+class WatcherAppAuthTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import os
+        from cryptography.fernet import Fernet
+        os.environ.setdefault(
+            "AGENT_RUNTIME_ARN",
+            "arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/LooseEnds",
+        )
+        os.environ.setdefault("DEMO_ACTOR_ID", "demo-actor")
+        os.environ.setdefault("GOOGLE_CLIENT_ID", "test-client-id")
+        os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test-client-secret")
+        os.environ.setdefault("GOOGLE_REDIRECT_URI", "http://localhost/auth/google/callback")
+        os.environ.setdefault("TOKEN_ENCRYPTION_KEY", Fernet.generate_key().decode("utf-8"))
+        os.environ.setdefault("DATABASE_PATH", str(Path(TemporaryDirectory().name) / "test.sqlite3"))
+
+        from fastapi.testclient import TestClient
+        import app as watcher_app
+        cls.app = watcher_app.app
+        cls.client = TestClient(cls.app, raise_server_exceptions=False)
+        cls.watcher_app = watcher_app
+
+    def setUp(self):
+        self.app = self.__class__.app
+        self.client = self.__class__.client
+        self.watcher_app = self.__class__.watcher_app
+
+    def test_public_endpoints_do_not_require_authentication(self):
+        with patch.object(
+            self.watcher_app.agentcore,
+            "create_alexa_pairing",
+            return_value={"code": "123456", "expires_at": "2026-09-03T13:00:00Z"},
+        ):
+            alexa_resp = self.client.get("/alexa/pair")
+            self.assertEqual(200, alexa_resp.status_code)
+            self.assertIn("123456", alexa_resp.text)
+
+            mobile_resp = self.client.get("/mobile/pair")
+            self.assertEqual(200, mobile_resp.status_code)
+            self.assertIn("123456", mobile_resp.text)
+
+        status_resp = self.client.get("/status")
+        self.assertEqual(200, status_resp.status_code)
+        self.assertIn("poll_interval_seconds", status_resp.json())
+
+    def test_admin_desk_requires_authentication(self):
+        fake_settings = SimpleNamespace(
+            admin_key="secret-test-key",
+            poll_interval_seconds=600,
+            database_path="/tmp/test.sqlite3",
+        )
+        with patch.object(self.watcher_app, "settings", fake_settings):
+            # Without credentials
+            unauth_resp = self.client.get("/admin")
+            self.assertEqual(401, unauth_resp.status_code)
+
+            # With wrong credentials
+            wrong_resp = self.client.get("/admin", auth=("admin", "wrong-password"))
+            self.assertEqual(401, wrong_resp.status_code)
+
+            # With correct credentials
+            auth_resp = self.client.get("/admin", auth=("admin", "secret-test-key"))
+            self.assertEqual(200, auth_resp.status_code)
+            self.assertIn("WATCHER DESK (ADMIN)", auth_resp.text)
+
+    def test_wordmark_has_invisible_admin_link(self):
+        resp = self.client.get("/")
+        self.assertEqual(200, resp.status_code)
+        self.assertIn('<a href="/admin" class="cut admin-link"', resp.text)
 
 
 if __name__ == "__main__":

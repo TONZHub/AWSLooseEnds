@@ -272,6 +272,11 @@ class ConnectionStore:
             )
             return cursor.rowcount > 0
 
+    def mobile_session_count(self) -> int:
+        with closing(self._connect()) as db, db:
+            row = db.execute("SELECT COUNT(*) AS count FROM mobile_sessions").fetchone()
+            return int(row["count"]) if row is not None else 0
+
     def _decode_connection(self, row: sqlite3.Row) -> GoogleConnection:
         decrypted = self._fernet.decrypt(row["refresh_token"]).decode("utf-8")
         last_checked_at = (
