@@ -322,6 +322,7 @@ class WatcherAppAuthTests(unittest.TestCase):
         resp = self.client.get("/")
         self.assertEqual(200, resp.status_code)
         self.assertIn('<a href="/admin" class="cut admin-link"', resp.text)
+        self.assertIn("actions-2x2", resp.text)
 
     def test_connect_google_endpoints(self):
         resp = self.client.get("/connect/google")

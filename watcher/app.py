@@ -224,9 +224,10 @@ RECEIPTS_CSS = """
   .lede { max-width:720px; font:clamp(1.05rem,2vw,1.35rem)/1.65 Georgia,serif; }
   .highlight { display:inline-block; padding:0 .24em; color:var(--yellow); background:#111; font-weight:900; transform:rotate(-1deg); }
   .evidence { margin:32px 0 24px; padding:24px; color:#eee6ce; background:#111; border-left:5px solid var(--red);
-    box-shadow:7px 8px 0 var(--red); }
+     box-shadow:7px 8px 0 var(--red); }
   .evidence p { font:italic 1.02rem/1.6 Georgia,serif; }
   .actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin:32px 0; }
+  .actions-2x2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 16px; margin:32px 0; }
   .action { display:block; min-height:112px; padding:20px; text-decoration:none; border:2px solid #111;
     background:#f5efdd; box-shadow:5px 6px 0 #111; transition:transform .15s,box-shadow .15s; }
   .action:hover,.action:focus-visible { transform:translate(-2px,-3px) rotate(-.4deg); box-shadow:8px 10px 0 var(--red); outline:none; }
@@ -253,6 +254,7 @@ RECEIPTS_CSS = """
   @media (max-width:600px) {
     .paper { padding:40px 22px 32px; }
     .wordmark { margin-top:24px; }
+    .actions-2x2 { grid-template-columns:1fr; }
     footer { flex-direction:column; }
   }
   @media (max-width:450px) {
@@ -317,7 +319,7 @@ def home() -> str:
           Every deadline—recorded. The ledger does not sleep.</p>
           <section class="evidence"><div class="stamp">intercepted · awaiting statement</div>
           <p>“I said I would do it. Receipts remembers the part that matters.”</p></section>
-          <nav class="actions" aria-label="Receipts actions">
+          <nav class="actions actions-2x2" aria-label="Receipts actions">
             <a class="action" href="/connect/google"><strong>Connect Gmail</strong><small>Watch authorized sent mail for commitments and evidence of follow-through.</small></a>
             <a class="action" href="/alexa/pair"><strong>Pair Alexa</strong><small>Generate a short-lived code. No Login with Amazon required.</small></a>
             <a class="action" href="/mobile/pair"><strong>Pair Android</strong><small>Issue a one-time code that connects the phone to this evidence ledger.</small></a>
