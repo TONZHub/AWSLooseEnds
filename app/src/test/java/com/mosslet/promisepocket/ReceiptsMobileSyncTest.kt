@@ -9,6 +9,7 @@ import com.mosslet.promisepocket.data.remote.CommitmentRemoteMapper
 import com.mosslet.promisepocket.data.remote.MobileCaptureRequest
 import com.mosslet.promisepocket.data.remote.MobileLinkRequest
 import com.mosslet.promisepocket.data.remote.MobileLinkResponse
+import com.mosslet.promisepocket.data.remote.MobileUnlinkResponse
 import com.mosslet.promisepocket.data.remote.ReceiptsMobileClient
 import com.mosslet.promisepocket.data.remote.SyncRequest
 import com.mosslet.promisepocket.data.remote.SyncResponse
@@ -19,6 +20,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -28,6 +30,7 @@ class FakeMobileApiService : CommitmentApiService {
     var lastTransitionAction: String? = null
     var lastTransitionCommitmentId: String? = null
     var remoteCommitments = mutableListOf<CommitmentRemoteEntity>()
+    var unlinkCalled: Boolean = false
 
     override suspend fun invokeOperation(request: SyncRequest): SyncResponse {
         return SyncResponse(operation = request.operation)
@@ -47,6 +50,11 @@ class FakeMobileApiService : CommitmentApiService {
                 actor_id = ""
             )
         }
+    }
+
+    override suspend fun unlink(): MobileUnlinkResponse {
+        unlinkCalled = true
+        return MobileUnlinkResponse(unlinked = true, revoked = true)
     }
 
     override suspend fun listCommitments(): SyncResponse {
@@ -173,5 +181,13 @@ class ReceiptsMobileSyncTest {
         val entity = CommitmentRemoteMapper.toEntity(candidate)
         assertEquals(CommitmentStatus.CANDIDATE, entity.status)
         assertTrue("Human action required should be true for candidates", entity.humanActionRequired)
+    }
+
+    @Test
+    fun testUnlinkMobile() = runBlocking {
+        val response = fakeApi.unlink()
+        assertTrue("fakeApi unlink should return unlinked=true", response.unlinked)
+        assertTrue("fakeApi unlink should return revoked=true", response.revoked)
+        assertTrue("fakeApi unlinkCalled flag should be true", fakeApi.unlinkCalled)
     }
 }

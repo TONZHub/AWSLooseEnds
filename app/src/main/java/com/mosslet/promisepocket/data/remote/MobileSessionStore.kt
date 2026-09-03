@@ -31,6 +31,13 @@ class MobileSessionStore(context: Context) {
             .apply()
     }
 
+    fun clear() {
+        preferences.edit()
+            .remove(KEY_TOKEN)
+            .remove(KEY_ACTOR_ID)
+            .apply()
+    }
+
     private companion object {
         const val KEY_INSTALLATION_ID = "installation_id"
         const val KEY_TOKEN = "token"

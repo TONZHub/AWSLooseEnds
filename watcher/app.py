@@ -390,6 +390,16 @@ def mobile_transition(
     )
 
 
+@app.post("/api/mobile/v1/unlink")
+def mobile_unlink(
+    credentials: HTTPAuthorizationCredentials | None = Depends(mobile_security),
+) -> dict:
+    if credentials is None or not credentials.credentials:
+        raise HTTPException(status_code=401, detail="missing authorization token")
+    revoked = store.revoke_mobile_session(credentials.credentials)
+    return {"unlinked": True, "revoked": revoked}
+
+
 @app.get("/auth/google/start", dependencies=[Depends(require_admin)])
 def google_auth_start() -> RedirectResponse:
     state = secrets.token_urlsafe(32)

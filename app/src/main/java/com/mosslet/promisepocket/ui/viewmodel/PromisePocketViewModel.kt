@@ -262,6 +262,15 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    fun unlinkDevice() {
+        viewModelScope.launch {
+            repository.unlinkMobile()
+            _showPairingDialog.value = false
+            _userNotification.value = "Unlinked from Receipts ledger. Running offline."
+            refreshData()
+        }
+    }
+
     fun dismissNotification() {
         _userNotification.value = null
         refreshData()

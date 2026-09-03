@@ -78,6 +78,20 @@ class CommitmentRepository(
         }
     }
 
+    suspend fun unlinkMobile(): Result<Unit> {
+        val client = mobileClient
+        val store = sessionStore
+        return runCatching {
+            try {
+                client?.service?.unlink()
+            } catch (_: Exception) {
+                // Ignore network failure; local session wipe is paramount
+            }
+            store?.clear()
+            Unit
+        }
+    }
+
     suspend fun captureRemote(text: String, sourceId: String = "android-app"): Result<SyncResponse> {
         val client = mobileClient ?: return Result.failure(IllegalStateException("Mobile client not configured"))
         return try {

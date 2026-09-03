@@ -263,6 +263,15 @@ class ConnectionStore:
                 )
         return str(row["actor_id"]) if row is not None else None
 
+    def revoke_mobile_session(self, token: str) -> bool:
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        with closing(self._connect()) as db, db:
+            cursor = db.execute(
+                "DELETE FROM mobile_sessions WHERE token_hash = ?",
+                (token_hash,),
+            )
+            return cursor.rowcount > 0
+
     def _decode_connection(self, row: sqlite3.Row) -> GoogleConnection:
         decrypted = self._fernet.decrypt(row["refresh_token"]).decode("utf-8")
         last_checked_at = (

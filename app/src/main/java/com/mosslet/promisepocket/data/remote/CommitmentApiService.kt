@@ -60,6 +60,12 @@ data class CommitmentRemoteEntity(
     val missing_information: List<String> = emptyList()
 )
 
+@Serializable
+data class MobileUnlinkResponse(
+    val unlinked: Boolean = true,
+    val revoked: Boolean = true
+)
+
 interface CommitmentApiService {
     // Retained until the ViewModel is migrated to the mobile pairing client.
     @POST("invoke")
@@ -67,6 +73,9 @@ interface CommitmentApiService {
 
     @POST("link")
     suspend fun link(@Body request: MobileLinkRequest): MobileLinkResponse
+
+    @POST("unlink")
+    suspend fun unlink(): MobileUnlinkResponse
 
     @GET("commitments")
     suspend fun listCommitments(): SyncResponse

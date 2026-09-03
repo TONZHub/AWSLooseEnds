@@ -95,6 +95,16 @@ class ConnectionStoreTests(unittest.TestCase):
         self.assertIsNone(self.store.mobile_actor_for_token("wrong-token"))
         self.assertNotIn(token.encode(), self.path.read_bytes())
 
+    def test_mobile_session_revocation_invalidates_token(self):
+        token = self.store.issue_mobile_session(
+            installation_id="installation-1234567890",
+            actor_id="mobile-demo",
+        )
+        self.assertEqual("mobile-demo", self.store.mobile_actor_for_token(token))
+        self.assertTrue(self.store.revoke_mobile_session(token))
+        self.assertIsNone(self.store.mobile_actor_for_token(token))
+        self.assertFalse(self.store.revoke_mobile_session(token))
+
     def test_oauth_state_is_one_time_and_preserves_pkce_verifier(self):
         self.store.save_oauth_state(
             state="good-state",

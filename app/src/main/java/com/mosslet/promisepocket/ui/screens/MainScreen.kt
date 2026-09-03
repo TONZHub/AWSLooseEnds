@@ -308,8 +308,11 @@ fun MainScreen(
         PairingDialog(
             isPairing = state.isPairing,
             errorMessage = state.pairingError,
+            isLinked = state.isLinked,
+            actorId = state.activeActorId,
             onDismiss = { viewModel.closePairingDialog() },
-            onPair = { code -> viewModel.pairWithCode(code) }
+            onPair = { code -> viewModel.pairWithCode(code) },
+            onUnlink = { viewModel.unlinkDevice() }
         )
     }
 
