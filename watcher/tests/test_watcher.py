@@ -293,6 +293,7 @@ class WatcherAppAuthTests(unittest.TestCase):
             mobile_resp = self.client.get("/mobile/pair")
             self.assertEqual(200, mobile_resp.status_code)
             self.assertIn("123456", mobile_resp.text)
+            self.assertIn("Return to the ledger", mobile_resp.text)
 
         status_resp = self.client.get("/status")
         self.assertEqual(200, status_resp.status_code)

@@ -369,7 +369,10 @@ def mobile_pair() -> str:
           <p class="lede">Enter this one-time evidence code in the Receipts app:</p>
           <div class="code"><span class="stamp">mobile pairing exhibit</span><strong>{code}</strong></div>
           <section class="evidence"><p>The code expires at {expires_at}. The phone receives a revocable token; the raw pairing code is never stored.</p></section>
-          <nav class="actions"><a class="action" href="/mobile/pair"><strong>Issue another code</strong><small>Create a fresh ten-minute mobile pairing exhibit.</small></a></nav>
+          <nav class="actions" aria-label="Mobile pairing actions">
+            <a class="action" href="/mobile/pair"><strong>Issue another code</strong><small>Create a fresh ten-minute mobile pairing exhibit.</small></a>
+            <a class="action" href="/"><strong>Return to the ledger</strong><small>Back to source connections and watcher status.</small></a>
+          </nav>
         """,
     )
 
