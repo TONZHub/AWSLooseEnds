@@ -30,6 +30,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -69,7 +71,9 @@ import com.mosslet.promisepocket.ui.components.AttentionSection
 import com.mosslet.promisepocket.ui.components.ClarificationDialog
 import com.mosslet.promisepocket.ui.components.CommitmentCard
 import com.mosslet.promisepocket.ui.components.CommitmentDetailDialog
+import com.mosslet.promisepocket.ui.components.PairingDialog
 import com.mosslet.promisepocket.ui.components.QuickCaptureBar
+import com.mosslet.promisepocket.ui.theme.GreenSuccess
 import com.mosslet.promisepocket.ui.theme.PromiseCream
 import com.mosslet.promisepocket.ui.theme.PromisePeach
 import com.mosslet.promisepocket.ui.theme.PromisePink
@@ -136,7 +140,16 @@ fun MainScreen(
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
-
+                    IconButton(
+                        onClick = { viewModel.openPairingDialog() },
+                        modifier = Modifier.testTag("btn_pairing")
+                    ) {
+                        Icon(
+                            imageVector = if (state.isLinked) Icons.Default.Link else Icons.Default.LinkOff,
+                            contentDescription = if (state.isLinked) "Linked to Receipts ledger" else "Pair device",
+                            tint = if (state.isLinked) GreenSuccess else PromisePink
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
@@ -183,7 +196,7 @@ fun MainScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    HeroBannerCard()
+                    HeroBannerCard(isLinked = state.isLinked)
                 }
 
                 if (state.attentionItems.isNotEmpty() && state.filterTab != FilterTab.COMPLETED) {
@@ -223,6 +236,18 @@ fun MainScreen(
                             },
                             onClick = {
                                 viewModel.openDetail(commitment.commitmentId)
+                            },
+                            onConfirmCandidate = {
+                                viewModel.confirmCandidate(commitment.commitmentId)
+                            },
+                            onDismissCandidate = {
+                                viewModel.dismissCandidate(commitment.commitmentId)
+                            },
+                            onMarkDone = {
+                                viewModel.markDone(commitment.commitmentId)
+                            },
+                            onReopen = {
+                                viewModel.reopenLikelyDone(commitment.commitmentId)
                             }
                         )
                     }
@@ -279,10 +304,19 @@ fun MainScreen(
         )
     }
 
+    if (state.showPairingDialog) {
+        PairingDialog(
+            isPairing = state.isPairing,
+            errorMessage = state.pairingError,
+            onDismiss = { viewModel.closePairingDialog() },
+            onPair = { code -> viewModel.pairWithCode(code) }
+        )
+    }
+
 }
 
 @Composable
-private fun HeroBannerCard() {
+private fun HeroBannerCard(isLinked: Boolean = false) {
     Surface(
         shape = RoundedCornerShape(2.dp),
         color = PromiseCream,
@@ -295,8 +329,11 @@ private fun HeroBannerCard() {
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp, vertical = 22.dp)
         ) {
-            Text("●  THE WATCHER IS ALIVE", color = PromisePink,
-                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.4.sp, fontWeight = FontWeight.Bold))
+            Text(
+                text = if (isLinked) "●  SHARED EVIDENCE LEDGER LINKED" else "○  OFFLINE LOCAL LEDGER (TAP LINK ICON TO PAIR)",
+                color = if (isLinked) GreenSuccess else PromisePink,
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.4.sp, fontWeight = FontWeight.Bold)
+            )
             Spacer(modifier = Modifier.height(14.dp))
             ReceiptsWordmark()
             Spacer(modifier = Modifier.height(16.dp))

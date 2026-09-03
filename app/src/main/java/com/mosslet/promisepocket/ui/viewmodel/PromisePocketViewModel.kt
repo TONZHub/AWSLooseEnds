@@ -7,6 +7,8 @@ import com.mosslet.promisepocket.data.local.AppDatabase
 import com.mosslet.promisepocket.data.model.AttentionItem
 import com.mosslet.promisepocket.data.model.CommitmentEntity
 import com.mosslet.promisepocket.data.model.CommitmentStatus
+import com.mosslet.promisepocket.data.remote.MobileSessionStore
+import com.mosslet.promisepocket.data.remote.ReceiptsMobileClient
 import com.mosslet.promisepocket.data.repository.CommitmentRepository
 import com.mosslet.promisepocket.domain.CommitmentService
 import com.mosslet.promisepocket.domain.PromiseParser
@@ -38,7 +40,12 @@ data class PromisePocketUiState(
     val attentionItems: List<AttentionItem> = emptyList(),
     val displayedCommitments: List<CommitmentEntity> = emptyList(),
     val totalPendingCount: Int = 0,
-    val totalHonoredCount: Int = 0
+    val totalHonoredCount: Int = 0,
+    val isLinked: Boolean = false,
+    val isPairing: Boolean = false,
+    val showPairingDialog: Boolean = false,
+    val pairingError: String? = null,
+    val activeActorId: String = "local-user"
 )
 
 class PromisePocketViewModel(application: Application) : AndroidViewModel(application) {
@@ -47,6 +54,8 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
         const val LOCAL_ACTOR_ID = "local-user"
     }
 
+    private val sessionStore = MobileSessionStore(application)
+    private val mobileClient = ReceiptsMobileClient(application)
     private val repository: CommitmentRepository
     val service: CommitmentService
     private val parser = PromiseParser()
@@ -58,23 +67,34 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
     private val _activeDetailCommitment = MutableStateFlow<CommitmentEntity?>(null)
     private val _userNotification = MutableStateFlow<String?>(null)
     private val _refreshTrigger = MutableStateFlow(0)
+    private val _isPairing = MutableStateFlow(false)
+    private val _showPairingDialog = MutableStateFlow(false)
+    private val _pairingError = MutableStateFlow<String?>(null)
 
     private val _uiState = MutableStateFlow(PromisePocketUiState())
     val uiState: StateFlow<PromisePocketUiState> = _uiState.asStateFlow()
 
     init {
         val db = AppDatabase.getDatabase(application)
-        repository = CommitmentRepository(db.commitmentDao())
+        repository = CommitmentRepository(
+            dao = db.commitmentDao(),
+            mobileClient = mobileClient,
+            sessionStore = sessionStore
+        )
         service = CommitmentService(repository)
 
         // Seed demo commitment if empty on first start
         viewModelScope.launch {
-            val existing = repository.listForActor(LOCAL_ACTOR_ID)
-            if (existing.isEmpty()) {
+            if (repository.isLinked) {
+                repository.syncWithCloud()
+            }
+            val currentActor = repository.currentActorId
+            val existing = repository.listForActor(currentActor)
+            if (existing.isEmpty() && !repository.isLinked) {
                 val now = Instant.now()
                 // 1. A commitment needing clarification (date only)
                 service.capture(
-                    actorId = LOCAL_ACTOR_ID,
+                    actorId = currentActor,
                     summary = "Call the dentist for Mom",
                     rawText = "I promised Mom I would call the dentist tomorrow",
                     dueAt = now.plus(1, ChronoUnit.DAYS).toString(),
@@ -84,7 +104,7 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
                 )
                 // 2. An exact promise with clock time
                 service.capture(
-                    actorId = LOCAL_ACTOR_ID,
+                    actorId = currentActor,
                     summary = "Send quarterly review report",
                     rawText = "Send quarterly review report by Friday at 2pm",
                     dueAt = now.plus(2, ChronoUnit.DAYS).toString(),
@@ -97,16 +117,30 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    fun refresh() {
+        viewModelScope.launch {
+            if (repository.isLinked) {
+                repository.syncWithCloud()
+            }
+            refreshData()
+        }
+    }
+
     private fun refreshData() {
         viewModelScope.launch {
+            val actorId = repository.currentActorId
             val tab = _filterTab.value
             val query = _searchQuery.value
             val capturing = _isCapturing.value
             val clarifyItem = _activeClarificationItem.value
             val detailItem = _activeDetailCommitment.value
             val notification = _userNotification.value
-            val commitments = repository.listForActor(LOCAL_ACTOR_ID)
-            val attention = service.review(LOCAL_ACTOR_ID, commitments)
+            val isPairing = _isPairing.value
+            val showPairing = _showPairingDialog.value
+            val pairingErr = _pairingError.value
+
+            val commitments = repository.listForActor(actorId)
+            val attention = service.review(actorId, commitments)
 
             val filtered = commitments.filter { item ->
                 val matchesQuery = query.isBlank() ||
@@ -115,14 +149,22 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
                         item.people.any { p -> p.contains(query, ignoreCase = true) }
 
                 val matchesTab = when (tab) {
-                    FilterTab.ALL -> item.status == CommitmentStatus.PENDING
-                    FilterTab.ATTENTION -> attention.any { it.commitmentId == item.commitmentId }
+                    FilterTab.ALL -> item.status in setOf(
+                        CommitmentStatus.PENDING,
+                        CommitmentStatus.ACTIVE,
+                        CommitmentStatus.CANDIDATE,
+                        CommitmentStatus.OVERDUE,
+                        CommitmentStatus.LIKELY_DONE
+                    )
+                    FilterTab.ATTENTION -> item.status == CommitmentStatus.CANDIDATE ||
+                            item.status == CommitmentStatus.LIKELY_DONE ||
+                            attention.any { it.commitmentId == item.commitmentId }
                     FilterTab.DUE -> {
-                        item.status == CommitmentStatus.PENDING &&
+                        (item.status == CommitmentStatus.PENDING || item.status == CommitmentStatus.ACTIVE || item.status == CommitmentStatus.OVERDUE) &&
                                 item.dueAt != null &&
                                 TimeUtils.parseInstant(item.dueAt)?.let { !it.isAfter(Instant.now()) } == true
                     }
-                    FilterTab.COMPLETED -> item.status == CommitmentStatus.COMPLETED
+                    FilterTab.COMPLETED -> item.status == CommitmentStatus.COMPLETED || item.status == CommitmentStatus.DONE
                 }
 
                 matchesQuery && matchesTab
@@ -137,8 +179,23 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
                 userNotification = notification,
                 attentionItems = attention,
                 displayedCommitments = filtered,
-                totalPendingCount = commitments.count { it.status == CommitmentStatus.PENDING },
-                totalHonoredCount = commitments.count { it.status == CommitmentStatus.COMPLETED }
+                totalPendingCount = commitments.count {
+                    it.status in setOf(
+                        CommitmentStatus.PENDING,
+                        CommitmentStatus.ACTIVE,
+                        CommitmentStatus.CANDIDATE,
+                        CommitmentStatus.OVERDUE,
+                        CommitmentStatus.LIKELY_DONE
+                    )
+                },
+                totalHonoredCount = commitments.count {
+                    it.status == CommitmentStatus.COMPLETED || it.status == CommitmentStatus.DONE
+                },
+                isLinked = repository.isLinked,
+                isPairing = isPairing,
+                showPairingDialog = showPairing,
+                pairingError = pairingErr,
+                activeActorId = actorId
             )
         }
     }
@@ -165,7 +222,7 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
 
     fun openDetail(commitmentId: String) {
         viewModelScope.launch {
-            val item = repository.getCommitment(LOCAL_ACTOR_ID, commitmentId)
+            val item = repository.getCommitment(repository.currentActorId, commitmentId)
             _activeDetailCommitment.value = item
             refreshData()
         }
@@ -174,6 +231,35 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
     fun closeDetail() {
         _activeDetailCommitment.value = null
         refreshData()
+    }
+
+    fun openPairingDialog() {
+        _showPairingDialog.value = true
+        _pairingError.value = null
+        refreshData()
+    }
+
+    fun closePairingDialog() {
+        _showPairingDialog.value = false
+        _pairingError.value = null
+        refreshData()
+    }
+
+    fun pairWithCode(code: String) {
+        viewModelScope.launch {
+            _isPairing.value = true
+            _pairingError.value = null
+            refreshData()
+            val result = repository.pairMobile(code)
+            result.onSuccess { response ->
+                _showPairingDialog.value = false
+                _userNotification.value = "Connected to Receipts ledger."
+            }.onFailure { error ->
+                _pairingError.value = error.message ?: "Pairing failed. Try a fresh 6-digit code."
+            }
+            _isPairing.value = false
+            refreshData()
+        }
     }
 
     fun dismissNotification() {
@@ -185,10 +271,11 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
         viewModelScope.launch {
             _isCapturing.value = true
             refreshData()
+            val actorId = repository.currentActorId
             try {
                 val parsed = parser.parseUserUtterance(rawText)
                 val commitment = service.capture(
-                    actorId = LOCAL_ACTOR_ID,
+                    actorId = actorId,
                     summary = parsed.summary,
                     rawText = rawText,
                     dueAt = parsed.dueAt,
@@ -196,6 +283,9 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
                     humanActionRequired = parsed.humanActionRequired,
                     missingInformation = parsed.missingInformation
                 )
+                if (repository.isLinked) {
+                    repository.captureRemote(rawText)
+                }
                 _userNotification.value = "Promise kept: \"${commitment.summary}\""
             } catch (e: Exception) {
                 _userNotification.value = "Error capturing promise: ${e.message}"
@@ -206,12 +296,85 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    fun confirmCandidate(commitmentId: String) {
+        viewModelScope.launch {
+            val actorId = repository.currentActorId
+            try {
+                if (repository.isLinked) {
+                    repository.transitionCommitment(commitmentId, "confirm")
+                } else {
+                    service.markStatus(actorId, commitmentId, CommitmentStatus.ACTIVE)
+                }
+                _userNotification.value = "Promise confirmed as active."
+            } catch (e: Exception) {
+                _userNotification.value = "Error confirming promise: ${e.message}"
+            } finally {
+                refreshData()
+            }
+        }
+    }
+
+    fun dismissCandidate(commitmentId: String) {
+        viewModelScope.launch {
+            val actorId = repository.currentActorId
+            try {
+                if (repository.isLinked) {
+                    repository.transitionCommitment(commitmentId, "cancel")
+                } else {
+                    service.markStatus(actorId, commitmentId, CommitmentStatus.CANCELED)
+                }
+                _userNotification.value = "Candidate dismissed."
+            } catch (e: Exception) {
+                _userNotification.value = "Error dismissing candidate: ${e.message}"
+            } finally {
+                refreshData()
+            }
+        }
+    }
+
+    fun markDone(commitmentId: String) {
+        viewModelScope.launch {
+            val actorId = repository.currentActorId
+            try {
+                if (repository.isLinked) {
+                    repository.transitionCommitment(commitmentId, "done")
+                } else {
+                    service.markStatus(actorId, commitmentId, CommitmentStatus.DONE)
+                }
+                _userNotification.value = "Promise marked done."
+            } catch (e: Exception) {
+                _userNotification.value = "Error updating promise: ${e.message}"
+            } finally {
+                refreshData()
+            }
+        }
+    }
+
+    fun reopenLikelyDone(commitmentId: String) {
+        viewModelScope.launch {
+            val actorId = repository.currentActorId
+            try {
+                if (repository.isLinked) {
+                    repository.transitionCommitment(commitmentId, "reopen")
+                } else {
+                    service.markStatus(actorId, commitmentId, CommitmentStatus.ACTIVE)
+                }
+                _userNotification.value = "Promise reopened."
+            } catch (e: Exception) {
+                _userNotification.value = "Error reopening promise: ${e.message}"
+            } finally {
+                refreshData()
+            }
+        }
+    }
+
     fun clarifyTime(answer: String, resolvedDueAtIso: String) {
         val activeItem = _activeClarificationItem.value ?: return
+        val actorId = repository.currentActorId
         viewModelScope.launch {
             try {
                 service.clarifyTime(
-                    actorId = LOCAL_ACTOR_ID,
+                    actorId = actorId,
                     commitmentId = activeItem.commitmentId,
                     answer = answer,
                     dueAt = resolvedDueAtIso
@@ -227,10 +390,11 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun setStatus(commitmentId: String, status: CommitmentStatus) {
+        val actorId = repository.currentActorId
         viewModelScope.launch {
             try {
-                service.markStatus(LOCAL_ACTOR_ID, commitmentId, status)
-                _activeDetailCommitment.value = repository.getCommitment(LOCAL_ACTOR_ID, commitmentId)
+                service.markStatus(actorId, commitmentId, status)
+                _activeDetailCommitment.value = repository.getCommitment(actorId, commitmentId)
             } catch (e: Exception) {
                 _userNotification.value = "Error updating status: ${e.message}"
             } finally {
@@ -240,10 +404,11 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun setBlockedReason(commitmentId: String, reason: String?) {
+        val actorId = repository.currentActorId
         viewModelScope.launch {
             try {
-                service.setBlockedReason(LOCAL_ACTOR_ID, commitmentId, reason)
-                _activeDetailCommitment.value = repository.getCommitment(LOCAL_ACTOR_ID, commitmentId)
+                service.setBlockedReason(actorId, commitmentId, reason)
+                _activeDetailCommitment.value = repository.getCommitment(actorId, commitmentId)
             } catch (e: Exception) {
                 _userNotification.value = "Error updating blocker: ${e.message}"
             } finally {
@@ -253,9 +418,10 @@ class PromisePocketViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun deleteCommitment(commitmentId: String) {
+        val actorId = repository.currentActorId
         viewModelScope.launch {
             try {
-                repository.deleteById(LOCAL_ACTOR_ID, commitmentId)
+                repository.deleteById(actorId, commitmentId)
                 _activeDetailCommitment.value = null
                 _userNotification.value = "Commitment deleted."
             } catch (e: Exception) {
