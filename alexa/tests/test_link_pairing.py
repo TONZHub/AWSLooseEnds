@@ -57,6 +57,7 @@ class AlexaPairingTests(unittest.TestCase):
         self.assertEqual("pair_claim", invoke.call_args.args[1]["operation"])
         self.assertEqual("482731", invoke.call_args.args[1]["code"])
         self.assertIn("Connected", response["response"]["outputSpeech"]["text"])
+        self.assertIn("same receipts", response["response"]["outputSpeech"]["text"])
 
     def test_pairing_intent_rejects_non_six_digit_code_without_runtime_call(self):
         with patch.object(lambda_function, "_invoke") as invoke:

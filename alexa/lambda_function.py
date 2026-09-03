@@ -190,7 +190,7 @@ def _pair(event: dict[str, Any], intent: dict[str, Any]):
     result = _invoke(event, {"operation": "pair_claim", "code": digits})
     if result.get("linked") is True:
         return _speech(
-            _first_turn(event, "Connected. Your Alexa promises will use the same pocket now.")
+            _first_turn(event, "Connected. Your Alexa promises will use the same receipts now.")
         )
     return _speech(
         _first_turn(event, "That code is invalid or expired. Make a new linking code and try again.")
@@ -349,7 +349,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return _capture(event, intent)
         if name == "LinkAlexaIntent":
             return _pair(event, intent)
-        if name == "ReviewPromisePocketIntent":
+        if name in {"ReviewPromisePocketIntent", "ReviewReceiptsIntent"}:
             return _review(event)
         if name in {"AMAZON.YesIntent", "CompleteReviewedPromiseIntent"}:
             return _answer_review(event, accepted=True)
