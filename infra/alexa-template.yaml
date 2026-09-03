@@ -44,6 +44,12 @@ Resources:
           Type: AlexaSkill
           Properties:
             SkillId: !Ref AlexaSkillId
+        ScheduledReview:
+          Type: Schedule
+          Properties:
+            Schedule: rate(15 minutes)
+            Name: ReceiptsQuietReviewSchedule
+            Description: Trigger quiet periodic review of overdue commitments.
 
 Outputs:
   AlexaLambdaArn:

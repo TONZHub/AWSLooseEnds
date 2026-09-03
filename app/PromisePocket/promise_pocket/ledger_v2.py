@@ -262,10 +262,16 @@ class PromiseLedger:
         evidence: PromiseEvidence,
     ) -> PromiseRecord:
         record = self._require(actor_id, commitment_id)
-        if record.status not in {PromiseState.ACTIVE, PromiseState.OVERDUE}:
+        if record.status not in {
+            PromiseState.ACTIVE,
+            PromiseState.OVERDUE,
+            PromiseState.LIKELY_DONE,
+        }:
             raise InvalidPromiseTransition(
                 f"cannot mark likely done from state {record.status.value}"
             )
+        if any(e.source == evidence.source and e.source_id == evidence.source_id for e in record.evidence):
+            return record
         return self._save(
             record,
             status=PromiseState.LIKELY_DONE,
