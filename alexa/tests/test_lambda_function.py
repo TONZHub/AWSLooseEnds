@@ -59,11 +59,11 @@ class AlexaAdapterTests(unittest.TestCase):
             os.path.dirname(os.path.dirname(__file__)), "interaction-model.json"
         )
         with open(model_path, encoding="utf-8") as model_file:
+            language_model = json.load(model_file)["interactionModel"]["languageModel"]
+            self.assertEqual("my receipts", language_model["invocationName"])
             intents = {
                 intent["name"]: set(intent.get("samples", []))
-                for intent in json.load(model_file)["interactionModel"]["languageModel"][
-                    "intents"
-                ]
+                for intent in language_model["intents"]
             }
 
         expected = {
@@ -403,6 +403,36 @@ class AlexaAdapterTests(unittest.TestCase):
         )
 
         self.assertTrue(lambda_function._actor_id(request).startswith("alexa-"))
+
+    def test_eventbridge_scheduled_event_runs_quiet_overdue_review(self):
+        scheduled_event = {
+            "version": "0",
+            "id": "event-123",
+            "detail-type": "Scheduled Event",
+            "source": "aws.events",
+            "time": "2026-09-03T12:00:00Z",
+            "region": "us-east-1",
+            "resources": ["arn:aws:events:us-east-1:123456789012:rule/ReceiptsQuietReviewSchedule"],
+            "detail": {},
+        }
+        body = BytesIO(
+            json.dumps({
+                "operation": "v2_overdue",
+                "overdue_ids": ["c-1"],
+                "nudges": [{"commitment_id": "c-1", "message": "Still unresolved"}],
+            }).encode()
+        )
+        client = Mock()
+        client.invoke_agent_runtime.return_value = {
+            "statusCode": 200,
+            "response": body,
+        }
+        with patch.object(lambda_function, "_agentcore_client", return_value=client):
+            result = lambda_function.lambda_handler(scheduled_event, None)
+        self.assertEqual("ok", result["status"])
+        self.assertEqual(1, result["overdue_count"])
+        self.assertEqual(1, result["nudges_prepared"])
+
 
 if __name__ == "__main__":
     unittest.main()

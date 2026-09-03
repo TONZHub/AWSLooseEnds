@@ -146,6 +146,85 @@ class EvidenceReconciliationTests(unittest.TestCase):
 
         self.assertIsNone(updated)
 
+    def test_cross_source_evidence_reconciles_alexa_with_gmail(self):
+        candidate = self.ledger.create_candidate(
+            actor_id="zoe",
+            deliverable="send the revised document",
+            raw_text="Alexa, remember that I promised to send the revised document.",
+            confidence=0.92,
+            source="alexa",
+            source_id="alexa-utterance-99",
+            due_at=NOW + timedelta(hours=12),
+        )
+        active = self.ledger.confirm(actor_id="zoe", commitment_id=candidate.commitment_id)
+
+        gmail_message = self.message(source="gmail", source_id="sent-email-88")
+        updated = self.ingestor.apply(
+            actor_id="zoe",
+            message=gmail_message,
+            proposal=self.proposal(active.commitment_id),
+        )
+
+        self.assertIsNotNone(updated)
+        self.assertEqual(PromiseState.LIKELY_DONE, updated.status)
+        self.assertEqual("alexa", updated.source)
+        self.assertEqual("gmail", updated.evidence[0].source)
+        self.assertEqual("sent-email-88", updated.evidence[0].source_id)
+
+    def test_multi_source_evidence_accumulation(self):
+        active = self.active_promise()
+
+        # First piece of evidence: sent email
+        first_msg = self.message(source="gmail", source_id="email-1", body="I sent the draft document.")
+        updated_1 = self.ingestor.apply(
+            actor_id="zoe",
+            message=first_msg,
+            proposal=self.proposal(active.commitment_id, supporting_text="I sent the draft document."),
+        )
+        self.assertIsNotNone(updated_1)
+        self.assertEqual(1, len(updated_1.evidence))
+
+        # Second piece of corroborating evidence: Drive upload
+        second_msg = self.message(
+            source="drive",
+            source_id="drive-file-2",
+            body="Uploaded final-document.pdf to shared folder.",
+            occurred_at=NOW + timedelta(hours=2),
+        )
+        updated_2 = self.ingestor.apply(
+            actor_id="zoe",
+            message=second_msg,
+            proposal=self.proposal(
+                active.commitment_id,
+                evidence_kind="file_upload",
+                supporting_text="Uploaded final-document.pdf to shared folder.",
+            ),
+        )
+        self.assertIsNotNone(updated_2)
+        self.assertEqual(2, len(updated_2.evidence))
+        self.assertEqual("gmail", updated_2.evidence[0].source)
+        self.assertEqual("drive", updated_2.evidence[1].source)
+
+    def test_duplicate_evidence_from_same_source_is_ignored(self):
+        active = self.active_promise()
+        msg = self.message()
+
+        updated_1 = self.ingestor.apply(
+            actor_id="zoe",
+            message=msg,
+            proposal=self.proposal(active.commitment_id),
+        )
+        self.assertIsNotNone(updated_1)
+        self.assertEqual(1, len(updated_1.evidence))
+
+        # Re-applying the exact same message is ignored
+        updated_2 = self.ingestor.apply(
+            actor_id="zoe",
+            message=msg,
+            proposal=self.proposal(active.commitment_id),
+        )
+        self.assertIsNone(updated_2)
+
 
 if __name__ == "__main__":
     unittest.main()

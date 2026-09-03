@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+import hashlib
 import logging
 from pathlib import Path
 import secrets
@@ -10,8 +11,14 @@ from secrets import compare_digest
 from urllib.parse import parse_qs
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBasic,
+    HTTPBasicCredentials,
+    HTTPBearer,
+)
+from pydantic import BaseModel, Field
 
 from agentcore_client import PocketPromiseAgentCoreClient
 from alexa_proactive import AlexaProactiveClient
@@ -42,7 +49,29 @@ alexa_proactive = (
     else None
 )
 security = HTTPBasic()
+mobile_security = HTTPBearer(auto_error=False)
 FAVICON_PATH = Path(__file__).with_name("favicon.png")
+
+
+class MobileLinkRequest(BaseModel):
+    code: str = Field(pattern=r"^\d{6}$")
+    installation_id: str = Field(min_length=16, max_length=200)
+
+
+class MobileCaptureRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+    source_id: str = Field(min_length=8, max_length=200)
+
+
+def require_mobile_actor(
+    credentials: HTTPAuthorizationCredentials | None = Depends(mobile_security),
+) -> str:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(status_code=401, detail="mobile link required")
+    actor_id = store.mobile_actor_for_token(credentials.credentials)
+    if actor_id is None:
+        raise HTTPException(status_code=401, detail="mobile link expired")
+    return actor_id
 
 
 async def scan_connection(connection: GoogleConnection) -> dict:
@@ -190,6 +219,8 @@ RECEIPTS_CSS = """
   .cut:nth-child(2n) { font-family:Impact,Haettenschweiler,sans-serif; background:var(--red); color:#f5ebd4; transform:rotate(3deg); }
   .cut:nth-child(3n) { background:#111; color:var(--yellow); transform:rotate(-1deg); }
   .cut:nth-child(5n) { font-style:italic; color:var(--red); transform:rotate(4deg); }
+  .admin-link { text-decoration:none; color:inherit; cursor:default; }
+  .admin-link:hover,.admin-link:focus { text-decoration:none; color:inherit; outline:none; }
   .lede { max-width:720px; font:clamp(1.05rem,2vw,1.35rem)/1.65 Georgia,serif; }
   .highlight { display:inline-block; padding:0 .24em; color:var(--yellow); background:#111; font-weight:900; transform:rotate(-1deg); }
   .evidence { margin:32px 0 24px; padding:24px; color:#eee6ce; background:#111; border-left:5px solid var(--red);
@@ -233,7 +264,7 @@ RECEIPTS_CSS = """
 
 def receipts_wordmark() -> str:
     return """<div class="wordmark" aria-label="Receipts">
-      <span class="cut">R</span><span class="cut">e</span><span class="cut">C</span>
+      <a href="/admin" class="cut admin-link" title="Receipts">R</a><span class="cut">e</span><span class="cut">C</span>
       <span class="cut">i</span><span class="cut">E</span><span class="cut">PT</span><span class="cut">S</span>
     </div>"""
 
@@ -252,6 +283,11 @@ def receipts_page(*, title: str, body: str) -> str:
 def require_admin(
     credentials: HTTPBasicCredentials = Depends(security),
 ) -> None:
+    if not settings.admin_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="watcher admin key is not configured on this instance",
+        )
     username_ok = compare_digest(credentials.username, "admin")
     password_ok = compare_digest(credentials.password, settings.admin_key)
     if not (username_ok and password_ok):
@@ -284,13 +320,14 @@ def home() -> str:
           <nav class="actions" aria-label="Receipts actions">
             <a class="action" href="/connect/google"><strong>Connect Gmail</strong><small>Watch authorized sent mail for commitments and evidence of follow-through.</small></a>
             <a class="action" href="/alexa/pair"><strong>Pair Alexa</strong><small>Generate a short-lived code. No Login with Amazon required.</small></a>
+            <a class="action" href="/mobile/pair"><strong>Pair Android</strong><small>Issue a one-time code that connects the phone to this evidence ledger.</small></a>
             <a class="action" href="/status"><strong>Watcher status</strong><small>Inspect connected sources and the last completed scan.</small></a>
           </nav>
         """,
     )
 
 
-@app.get("/alexa/pair", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
+@app.get("/alexa/pair", response_class=HTMLResponse)
 def alexa_pair() -> str:
     result = agentcore.create_alexa_pairing(actor_id=settings.demo_actor_id)
     code = result.get("code")
@@ -306,7 +343,7 @@ def alexa_pair() -> str:
           <p class="lede">Read this one-time evidence code to Alexa:</p>
           <div class="code"><span class="stamp">pairing exhibit</span><strong>{code}</strong></div>
           <section class="evidence"><div class="stamp">statement</div>
-          <p>“Alexa, tell Receipts to link code {code}.”</p></section>
+          <p>“Alexa, tell my receipts to link code {code}.”</p></section>
           <p class="meta">Single-use. Expires at {expires_at}. After Alexa confirms the connection,
           anything captured through this Alexa identity resolves to the selected ledger.</p>
           <nav class="actions" aria-label="Pairing actions">
@@ -317,10 +354,38 @@ def alexa_pair() -> str:
     )
 
 
+@app.get("/mobile/pair", response_class=HTMLResponse)
+def mobile_pair() -> str:
+    result = agentcore.create_alexa_pairing(actor_id=settings.demo_actor_id)
+    code = result.get("code")
+    expires_at = result.get("expires_at")
+    if not isinstance(code, str) or len(code) != 6 or not code.isdigit():
+        raise HTTPException(status_code=502, detail="AgentCore returned an invalid pairing code")
+    return receipts_page(
+        title="Pair Android",
+        body=f"""
+          <p class="lede">Enter this one-time evidence code in the Receipts app:</p>
+          <div class="code"><span class="stamp">mobile pairing exhibit</span><strong>{code}</strong></div>
+          <section class="evidence"><p>The code expires at {expires_at}. The phone receives a revocable token; the raw pairing code is never stored.</p></section>
+          <nav class="actions"><a class="action" href="/mobile/pair"><strong>Issue another code</strong><small>Create a fresh ten-minute mobile pairing exhibit.</small></a></nav>
+        """,
+    )
+
+
 def google_connect_page(*, invalid_key: bool = False) -> str:
     error_html = (
         '<p class="auth-error" role="alert">That access key did not match the ledger.</p>'
         if invalid_key
+        else ""
+    )
+    key_field = (
+        """
+        <label for="access-key">Evidence desk access key</label>
+        <input id="access-key" name="access_key" type="password" required
+          autocomplete="current-password" aria-describedby="access-key-note">
+        <small class="meta" id="access-key-note">This protects the configured demo ledger before Google authorization begins.</small>
+        """
+        if settings.admin_key
         else ""
     )
     return receipts_page(
@@ -332,10 +397,7 @@ def google_connect_page(*, invalid_key: bool = False) -> str:
           <p>Read-only Gmail access. Full messages are inspected in transit and are not stored by the watcher.</p></section>
           <form class="source-auth" method="post" action="/connect/google">
             {error_html}
-            <label for="access-key">Evidence desk access key</label>
-            <input id="access-key" name="access_key" type="password" required
-              autocomplete="current-password" aria-describedby="access-key-note">
-            <small class="meta" id="access-key-note">This protects the configured demo ledger before Google authorization begins.</small>
+            {key_field}
             <button class="google-button" type="submit">
               <img src="https://developers.google.com/identity/images/g-logo.png" alt="" referrerpolicy="no-referrer">
               Continue with Google
@@ -345,6 +407,62 @@ def google_connect_page(*, invalid_key: bool = False) -> str:
           You will return here with a connection receipt when authorization finishes.</p>
         """,
     )
+
+
+@app.post("/api/mobile/v1/link")
+def mobile_link(payload: MobileLinkRequest) -> dict:
+    installation_hash = hashlib.sha256(payload.installation_id.encode()).hexdigest()
+    actor_id = f"mobile-{installation_hash}"
+    result = agentcore.claim_pairing(actor_id=actor_id, code=payload.code)
+    if result.get("linked") is not True:
+        raise HTTPException(status_code=400, detail="invalid or expired pairing code")
+    token = store.issue_mobile_session(
+        installation_id=payload.installation_id,
+        actor_id=actor_id,
+    )
+    return {"linked": True, "token": token, "actor_id": actor_id}
+
+
+@app.get("/api/mobile/v1/commitments")
+def mobile_commitments(actor_id: str = Depends(require_mobile_actor)) -> dict:
+    return agentcore.list_commitments(actor_id=actor_id)
+
+
+@app.post("/api/mobile/v1/capture")
+def mobile_capture(
+    payload: MobileCaptureRequest,
+    actor_id: str = Depends(require_mobile_actor),
+) -> dict:
+    return agentcore.capture_mobile_message(
+        actor_id=actor_id,
+        source_id=payload.source_id,
+        text=payload.text,
+    )
+
+
+@app.post("/api/mobile/v1/commitments/{commitment_id}/{action}")
+def mobile_transition(
+    commitment_id: str,
+    action: str,
+    actor_id: str = Depends(require_mobile_actor),
+) -> dict:
+    if action not in {"confirm", "done", "reopen", "cancel"}:
+        raise HTTPException(status_code=404, detail="unsupported commitment action")
+    return agentcore.transition_commitment(
+        actor_id=actor_id,
+        commitment_id=commitment_id,
+        action=action,
+    )
+
+
+@app.post("/api/mobile/v1/unlink")
+def mobile_unlink(
+    credentials: HTTPAuthorizationCredentials | None = Depends(mobile_security),
+) -> dict:
+    if credentials is None or not credentials.credentials:
+        raise HTTPException(status_code=401, detail="missing authorization token")
+    revoked = store.revoke_mobile_session(credentials.credentials)
+    return {"unlinked": True, "revoked": revoked}
 
 
 def begin_google_authorization() -> RedirectResponse:
@@ -374,17 +492,17 @@ def google_connect() -> str:
     return google_connect_page()
 
 
-@app.post("/connect/google", response_class=HTMLResponse)
-async def google_connect_submit(request: Request) -> HTMLResponse | RedirectResponse:
+@app.post("/connect/google", response_model=None)
+async def google_connect_submit(request: Request) -> Response:
     body = await request.body()
     values = parse_qs(body[:4096].decode("utf-8", errors="replace"), keep_blank_values=True)
     access_key = str((values.get("access_key") or [""])[0])
-    if not compare_digest(access_key, settings.admin_key):
+    if settings.admin_key and not compare_digest(access_key, settings.admin_key):
         return HTMLResponse(google_connect_page(invalid_key=True), status_code=401)
     return begin_google_authorization()
 
 
-@app.get("/auth/google/start", dependencies=[Depends(require_admin)])
+@app.get("/auth/google/start")
 def google_auth_start() -> RedirectResponse:
     return begin_google_authorization()
 
@@ -470,9 +588,65 @@ async def scan_now() -> dict:
     return {"results": await scan_all_connections()}
 
 
-@app.get("/status", dependencies=[Depends(require_admin)])
+@app.get("/status")
 def watcher_status() -> dict:
     return {
         "poll_interval_seconds": settings.poll_interval_seconds,
         "connections": store.public_status(),
     }
+
+
+@app.get("/admin", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
+def admin_desk() -> str:
+    connections = store.public_status()
+    session_count = store.mobile_session_count()
+    conn_items = "".join(
+        f"<li><strong>{c['email']}</strong> (actor: <code>{c['actor_id']}</code>) — last checked: {c['last_checked_at'] or 'never'}</li>"
+        for c in connections
+    ) or "<li>No external sources connected yet.</li>"
+    return receipts_page(
+        title="Admin Desk",
+        body=f"""
+          <p class="lede"><span class="highlight">WATCHER DESK (ADMIN).</span> Restricted access.</p>
+          <section class="evidence"><div class="stamp">system state</div>
+          <p>Poll interval: <strong>{settings.poll_interval_seconds}s</strong> · Database: <code>{settings.database_path}</code></p>
+          <p>Active mobile sessions: <strong>{session_count}</strong> · Connected sources: <strong>{len(connections)}</strong></p>
+          <ul style="margin:12px 0;padding-left:20px;font-family:inherit;font-size:.9rem;line-height:1.6">
+            {conn_items}
+          </ul>
+          </section>
+          <nav class="actions" aria-label="Admin actions">
+            <form action="/admin/scan-now" method="post" style="display:contents">
+              <button type="submit" class="action" style="text-align:left;font-family:inherit;font-size:inherit;cursor:pointer">
+                <strong>Trigger Scan Now</strong>
+                <small>Run an immediate scan and evidence reconciliation cycle across all accounts.</small>
+              </button>
+            </form>
+            <a class="action" href="/status"><strong>Raw Status JSON</strong><small>Inspect JSON endpoint response.</small></a>
+            <a class="action" href="/"><strong>Public Evidence Desk</strong><small>Return to public user landing page.</small></a>
+          </nav>
+        """,
+    )
+
+
+@app.post("/admin/scan-now", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
+async def admin_scan_now() -> str:
+    results = await scan_all_connections()
+    summary = "<br>".join(
+        f"• {r.get('email', 'unknown')}: checked {r.get('messages_checked', 0)} messages, "
+        f"{r.get('candidates_seen', 0)} candidates, {r.get('likely_done_seen', 0)} likely done"
+        for r in results
+    ) or "No connections to scan."
+    return receipts_page(
+        title="Scan Completed",
+        body=f"""
+          <p class="lede"><span class="highlight">SCAN COMPLETED.</span> All connections reconciled.</p>
+          <section class="evidence"><div class="stamp">scan output</div>
+          <p>{summary}</p>
+          </section>
+          <nav class="actions" aria-label="Admin scan actions">
+            <a class="action" href="/admin"><strong>Return to Admin Desk</strong><small>Back to watcher administration.</small></a>
+            <a class="action" href="/"><strong>Public Ledger</strong><small>Back to home.</small></a>
+          </nav>
+        """,
+    )

@@ -94,7 +94,13 @@ class EvidenceIngestor:
         )
         if record is None:
             return None
-        if record.status not in {PromiseState.ACTIVE, PromiseState.OVERDUE}:
+        if record.status not in {
+            PromiseState.ACTIVE,
+            PromiseState.OVERDUE,
+            PromiseState.LIKELY_DONE,
+        }:
+            return None
+        if any(e.source == message.source and e.source_id == message.source_id for e in record.evidence):
             return None
         if (
             record.source_id

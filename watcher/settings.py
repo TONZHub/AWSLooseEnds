@@ -58,7 +58,6 @@ class WatcherSettings:
             "GOOGLE_REDIRECT_URI": self.google_redirect_uri,
             "TOKEN_ENCRYPTION_KEY": self.token_encryption_key,
             "DEMO_ACTOR_ID": self.demo_actor_id,
-            "WATCHER_ADMIN_KEY": self.admin_key,
             "AGENT_RUNTIME_ARN": self.agent_runtime_arn,
         }
         missing = [name for name, value in required.items() if not value]

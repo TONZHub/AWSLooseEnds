@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -30,6 +31,7 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,10 +65,17 @@ fun CommitmentCard(
     commitment: CommitmentEntity,
     onStatusToggle: (CommitmentStatus) -> Unit,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onConfirmCandidate: (() -> Unit)? = null,
+    onDismissCandidate: (() -> Unit)? = null,
+    onMarkDone: (() -> Unit)? = null,
+    onReopen: (() -> Unit)? = null
 ) {
-    val isCompleted = commitment.status == CommitmentStatus.COMPLETED
+    val isCompleted = commitment.status == CommitmentStatus.COMPLETED || commitment.status == CommitmentStatus.DONE
     val isCanceled = commitment.status == CommitmentStatus.CANCELED
+    val isCandidate = commitment.status == CommitmentStatus.CANDIDATE
+    val isLikelyDone = commitment.status == CommitmentStatus.LIKELY_DONE
+    val isOverdue = commitment.status == CommitmentStatus.OVERDUE
 
     Card(
         modifier = modifier
@@ -99,7 +108,7 @@ fun CommitmentCard(
             // Checkbox for rapid status toggle
             IconButton(
                 onClick = {
-                    val next = if (isCompleted) CommitmentStatus.PENDING else CommitmentStatus.COMPLETED
+                    val next = if (isCompleted) CommitmentStatus.ACTIVE else CommitmentStatus.DONE
                     onStatusToggle(next)
                 },
                 modifier = Modifier
@@ -275,6 +284,89 @@ fun CommitmentCard(
                                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                         color = IndigoBlocked
                                     )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Explicit actions for CANDIDATE or LIKELY_DONE
+                if (isCandidate) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = AmberClarifyBg,
+                        border = BorderStroke(1.dp, AmberClarify),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text(
+                                text = "PROPOSED COMMITMENT — Awaiting confirmation",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = AmberClarify
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { onConfirmCandidate?.invoke() },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(34.dp),
+                                    shape = RoundedCornerShape(2.dp)
+                                ) {
+                                    Text("Track Promise", style = MaterialTheme.typography.labelSmall)
+                                }
+                                OutlinedButton(
+                                    onClick = { onDismissCandidate?.invoke() },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(34.dp),
+                                    shape = RoundedCornerShape(2.dp)
+                                ) {
+                                    Text("Dismiss", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    }
+                } else if (isLikelyDone) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = GreenSuccessBg,
+                        border = BorderStroke(1.dp, GreenSuccess),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text(
+                                text = "EVIDENCE FOUND — Appears completed",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = GreenSuccess
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { onMarkDone?.invoke() },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(34.dp),
+                                    shape = RoundedCornerShape(2.dp)
+                                ) {
+                                    Text("Confirm Done", style = MaterialTheme.typography.labelSmall)
+                                }
+                                OutlinedButton(
+                                    onClick = { onReopen?.invoke() },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(34.dp),
+                                    shape = RoundedCornerShape(2.dp)
+                                ) {
+                                    Text("Keep Open", style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                         }

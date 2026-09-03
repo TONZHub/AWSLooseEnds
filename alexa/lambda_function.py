@@ -190,7 +190,7 @@ def _pair(event: dict[str, Any], intent: dict[str, Any]):
     result = _invoke(event, {"operation": "pair_claim", "code": digits})
     if result.get("linked") is True:
         return _speech(
-            _first_turn(event, "Connected. Your Alexa promises will use the same pocket now.")
+            _first_turn(event, "Connected. Your Alexa promises will use the same receipts now.")
         )
     return _speech(
         _first_turn(event, "That code is invalid or expired. Make a new linking code and try again.")
@@ -323,9 +323,49 @@ def _clarify(event: dict[str, Any], intent: dict[str, Any]):
     )
 
 
+def _handle_scheduled_event(event: dict[str, Any]) -> dict[str, Any]:
+    """Quiet scheduled review triggered by EventBridge.
+
+    Evaluates overdue promises. If nothing is overdue or no action is required,
+    it exits quietly without emitting false notifications.
+    """
+    if not AGENT_RUNTIME_ARN:
+        raise RuntimeError("AGENT_RUNTIME_ARN is not configured")
+    actor_id = event.get("actor_id") or "scheduled-review"
+    event_id = event.get("id") or "default-scheduled-id"
+    session_id = f"alexa-scheduled-{hashlib.sha256(event_id.encode()).hexdigest()}"
+    try:
+        response = _agentcore_client().invoke_agent_runtime(
+            agentRuntimeArn=AGENT_RUNTIME_ARN,
+            qualifier="DEFAULT",
+            runtimeSessionId=session_id,
+            runtimeUserId=actor_id,
+            contentType="application/json",
+            accept="application/json",
+            payload=json.dumps({"operation": "v2_overdue", "actor_id": actor_id}).encode("utf-8"),
+        )
+        if response.get("statusCode") != 200:
+            raise RuntimeError(f"AgentCore returned {response.get('statusCode')}")
+        result = _read_runtime_response(response)
+        overdue_ids = result.get("overdue_ids") or []
+        nudges = result.get("nudges") or []
+        return {
+            "status": "ok",
+            "overdue_count": len(overdue_ids),
+            "nudges_prepared": len(nudges),
+        }
+    except Exception as e:
+        LOGGER.exception("Scheduled review evaluation failed: %s", e)
+        return {"status": "error", "error": str(e)}
+
+
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     del context
     try:
+        source = event.get("source")
+        if source == "aws.events" or event.get("detail-type") == "Scheduled Event":
+            return _handle_scheduled_event(event)
+
         _verify_skill(event)
         request = event.get("request", {})
         request_type = request.get("type")
@@ -349,7 +389,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return _capture(event, intent)
         if name == "LinkAlexaIntent":
             return _pair(event, intent)
-        if name == "ReviewPromisePocketIntent":
+        if name in {"ReviewPromisePocketIntent", "ReviewReceiptsIntent"}:
             return _review(event)
         if name in {"AMAZON.YesIntent", "CompleteReviewedPromiseIntent"}:
             return _answer_review(event, accepted=True)

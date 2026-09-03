@@ -23,6 +23,7 @@ app/src/main/assets/api_key.txt
 # Android Build Outputs & Keystores
 *.apk
 *.aab
+*.zip
 debug.keystore
 debug.keystore.base64
 

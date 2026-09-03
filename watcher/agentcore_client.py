@@ -110,3 +110,48 @@ class PocketPromiseAgentCoreClient:
             operation="pair_create",
             actor_id=actor_id,
         )
+
+    def claim_pairing(self, *, actor_id: str, code: str) -> dict[str, Any]:
+        return self._invoke_operation(
+            operation="pair_claim",
+            actor_id=actor_id,
+            extra_payload={"code": code},
+            session_seed=code,
+        )
+
+    def list_commitments(self, *, actor_id: str) -> dict[str, Any]:
+        return self._invoke_operation(operation="v2_list", actor_id=actor_id)
+
+    def capture_mobile_message(
+        self, *, actor_id: str, source_id: str, text: str
+    ) -> dict[str, Any]:
+        return self._invoke_source_operation(
+            operation="v2_arbitrate",
+            actor_id=actor_id,
+            source_message={
+                "source": "android",
+                "source_id": source_id,
+                "direction": "outgoing",
+                "body": text,
+                "participants": [],
+            },
+        )
+
+    def transition_commitment(
+        self, *, actor_id: str, commitment_id: str, action: str
+    ) -> dict[str, Any]:
+        operations = {
+            "done": "v2_done",
+            "reopen": "v2_reopen",
+            "cancel": "v2_cancel",
+            "confirm": "v2_confirm",
+        }
+        operation = operations.get(action)
+        if operation is None:
+            raise ValueError(f"unsupported commitment action: {action}")
+        return self._invoke_operation(
+            operation=operation,
+            actor_id=actor_id,
+            extra_payload={"commitment_id": commitment_id},
+            session_seed=commitment_id,
+        )

@@ -85,6 +85,39 @@ class ConnectionStoreTests(unittest.TestCase):
             [nudges[1]], self.store.pending_nudges(actor_id="zoe", nudges=nudges)
         )
 
+    def test_mobile_session_token_is_hashed_and_resolves_actor(self):
+        token = self.store.issue_mobile_session(
+            installation_id="installation-1234567890",
+            actor_id="mobile-demo",
+        )
+
+        self.assertEqual("mobile-demo", self.store.mobile_actor_for_token(token))
+        self.assertIsNone(self.store.mobile_actor_for_token("wrong-token"))
+        self.assertNotIn(token.encode(), self.path.read_bytes())
+
+    def test_mobile_session_revocation_invalidates_token(self):
+        token = self.store.issue_mobile_session(
+            installation_id="installation-1234567890",
+            actor_id="mobile-demo",
+        )
+        self.assertEqual("mobile-demo", self.store.mobile_actor_for_token(token))
+        self.assertTrue(self.store.revoke_mobile_session(token))
+        self.assertIsNone(self.store.mobile_actor_for_token(token))
+        self.assertFalse(self.store.revoke_mobile_session(token))
+
+    def test_mobile_session_count(self):
+        self.assertEqual(0, self.store.mobile_session_count())
+        self.store.issue_mobile_session(
+            installation_id="install-1",
+            actor_id="mobile-1",
+        )
+        self.assertEqual(1, self.store.mobile_session_count())
+        self.store.issue_mobile_session(
+            installation_id="install-2",
+            actor_id="mobile-2",
+        )
+        self.assertEqual(2, self.store.mobile_session_count())
+
     def test_oauth_state_is_one_time_and_preserves_pkce_verifier(self):
         self.store.save_oauth_state(
             state="good-state",
@@ -167,6 +200,29 @@ class AgentCoreClientTests(unittest.TestCase):
         )
         self.assertNotIn("notification", request)
 
+    @patch("agentcore_client.boto3.client")
+    def test_mobile_pair_claim_binds_runtime_identity(self, build_client):
+        runtime = build_client.return_value
+        runtime.invoke_agent_runtime.return_value = {
+            "statusCode": 200,
+            "response": io.BytesIO(
+                json.dumps({"operation": "pair_claim", "linked": True}).encode()
+            ),
+        }
+        client = PocketPromiseAgentCoreClient(
+            SimpleNamespace(aws_region="us-east-1", agent_runtime_arn="arn:example")
+        )
+
+        result = client.claim_pairing(actor_id="mobile-demo", code="123456")
+
+        self.assertTrue(result["linked"])
+        request = runtime.invoke_agent_runtime.call_args.kwargs
+        self.assertEqual("mobile-demo", request["runtimeUserId"])
+        self.assertEqual(
+            {"operation": "pair_claim", "actor_id": "mobile-demo", "code": "123456"},
+            json.loads(request["payload"]),
+        )
+
 
 class AlexaProactiveClientTests(unittest.TestCase):
     @patch("alexa_proactive._post")
@@ -195,6 +251,94 @@ class AlexaProactiveClientTests(unittest.TestCase):
         self.assertEqual(
             {"type": "Multicast", "payload": {}}, payload["relevantAudience"]
         )
+
+
+class WatcherAppAuthTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import os
+        from cryptography.fernet import Fernet
+        os.environ.setdefault(
+            "AGENT_RUNTIME_ARN",
+            "arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/LooseEnds",
+        )
+        os.environ.setdefault("DEMO_ACTOR_ID", "demo-actor")
+        os.environ.setdefault("GOOGLE_CLIENT_ID", "test-client-id")
+        os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test-client-secret")
+        os.environ.setdefault("GOOGLE_REDIRECT_URI", "http://localhost/auth/google/callback")
+        os.environ.setdefault("TOKEN_ENCRYPTION_KEY", Fernet.generate_key().decode("utf-8"))
+        os.environ.setdefault("DATABASE_PATH", str(Path(TemporaryDirectory().name) / "test.sqlite3"))
+
+        from fastapi.testclient import TestClient
+        import app as watcher_app
+        cls.app = watcher_app.app
+        cls.client = TestClient(cls.app, raise_server_exceptions=False)
+        cls.watcher_app = watcher_app
+
+    def setUp(self):
+        self.app = self.__class__.app
+        self.client = self.__class__.client
+        self.watcher_app = self.__class__.watcher_app
+
+    def test_public_endpoints_do_not_require_authentication(self):
+        with patch.object(
+            self.watcher_app.agentcore,
+            "create_alexa_pairing",
+            return_value={"code": "123456", "expires_at": "2026-09-03T13:00:00Z"},
+        ):
+            alexa_resp = self.client.get("/alexa/pair")
+            self.assertEqual(200, alexa_resp.status_code)
+            self.assertIn("123456", alexa_resp.text)
+
+            mobile_resp = self.client.get("/mobile/pair")
+            self.assertEqual(200, mobile_resp.status_code)
+            self.assertIn("123456", mobile_resp.text)
+
+        status_resp = self.client.get("/status")
+        self.assertEqual(200, status_resp.status_code)
+        self.assertIn("poll_interval_seconds", status_resp.json())
+
+    def test_admin_desk_requires_authentication(self):
+        fake_settings = SimpleNamespace(
+            admin_key="secret-test-key",
+            poll_interval_seconds=600,
+            database_path="/tmp/test.sqlite3",
+        )
+        with patch.object(self.watcher_app, "settings", fake_settings):
+            # Without credentials
+            unauth_resp = self.client.get("/admin")
+            self.assertEqual(401, unauth_resp.status_code)
+
+            # With wrong credentials
+            wrong_resp = self.client.get("/admin", auth=("admin", "wrong-password"))
+            self.assertEqual(401, wrong_resp.status_code)
+
+            # With correct credentials
+            auth_resp = self.client.get("/admin", auth=("admin", "secret-test-key"))
+            self.assertEqual(200, auth_resp.status_code)
+            self.assertIn("WATCHER DESK (ADMIN)", auth_resp.text)
+
+    def test_wordmark_has_invisible_admin_link(self):
+        resp = self.client.get("/")
+        self.assertEqual(200, resp.status_code)
+        self.assertIn('<a href="/admin" class="cut admin-link"', resp.text)
+
+    def test_connect_google_endpoints(self):
+        resp = self.client.get("/connect/google")
+        self.assertEqual(200, resp.status_code)
+        self.assertIn("Connect Gmail", resp.text)
+
+        with patch.object(self.watcher_app, "begin_google_authorization") as begin_auth:
+            from fastapi.responses import RedirectResponse
+            begin_auth.return_value = RedirectResponse("https://accounts.google.com/test", status_code=303)
+
+            # Test POST /connect/google
+            post_resp = self.client.post("/connect/google", data={}, follow_redirects=False)
+            self.assertIn(post_resp.status_code, (302, 303, 307))
+
+            # Test GET /auth/google/start
+            start_resp = self.client.get("/auth/google/start", follow_redirects=False)
+            self.assertIn(start_resp.status_code, (302, 303, 307))
 
 
 if __name__ == "__main__":

@@ -9,6 +9,11 @@ import java.util.UUID
 @Serializable
 enum class CommitmentStatus(val value: String) {
     PENDING("pending"),
+    CANDIDATE("candidate"),
+    ACTIVE("active"),
+    LIKELY_DONE("likely_done"),
+    DONE("done"),
+    OVERDUE("overdue"),
     COMPLETED("completed"),
     CANCELED("canceled")
 }
