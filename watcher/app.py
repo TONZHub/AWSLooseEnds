@@ -372,39 +372,27 @@ def mobile_pair() -> str:
     )
 
 
-def google_connect_page(*, invalid_key: bool = False) -> str:
-    error_html = (
-        '<p class="auth-error" role="alert">That access key did not match the ledger.</p>'
-        if invalid_key
-        else ""
-    )
-    key_field = (
-        """
-        <label for="access-key">Evidence desk access key</label>
-        <input id="access-key" name="access_key" type="password" required
-          autocomplete="current-password" aria-describedby="access-key-note">
-        <small class="meta" id="access-key-note">This protects the configured demo ledger before Google authorization begins.</small>
-        """
-        if settings.admin_key
-        else ""
-    )
+def google_connect_page() -> str:
     return receipts_page(
         title="Connect Gmail",
-        body=f"""
+        body="""
           <p class="lede">Authorize a new <span class="highlight">SOURCE.</span>
           Receipts will inspect authorized sent mail for promises and evidence of follow-through.</p>
-          <section class="evidence"><div class="stamp">chain of custody</div>
-          <p>Read-only Gmail access. Full messages are inspected in transit and are not stored by the watcher.</p></section>
-          <form class="source-auth" method="post" action="/connect/google">
-            {error_html}
-            {key_field}
-            <button class="google-button" type="submit">
-              <img src="https://developers.google.com/identity/images/g-logo.png" alt="" referrerpolicy="no-referrer">
-              Continue with Google
-            </button>
-          </form>
-          <p class="meta">The next screen belongs to Google, so its account chooser cannot wear the Receipts theme.
-          You will return here with a connection receipt when authorization finishes.</p>
+          <section class="evidence"><div class="stamp">verified app · read-only access</div>
+          <p>Receipts is verified by Google for read-only Gmail access (<code>gmail.readonly</code>).
+          Full message bodies are inspected in transit solely for commitments and evidence of follow-through—messages are never stored, indexed, or shared.</p></section>
+          <div class="source-auth">
+            <form method="post" action="/connect/google">
+              <button class="google-button" type="submit">
+                <img src="https://developers.google.com/identity/images/g-logo.png" alt="" referrerpolicy="no-referrer">
+                Continue with Google
+              </button>
+            </form>
+          </div>
+          <p class="meta">Verified by Google. No access key required. You will be redirected to Google to select your account and grant read-only access, then returned here with a connection receipt.</p>
+          <nav class="actions" aria-label="Connection navigation">
+            <a class="action" href="/"><strong>Return to Receipts</strong><small>Back to the evidence ledger.</small></a>
+          </nav>
         """,
     )
 
@@ -493,12 +481,7 @@ def google_connect() -> str:
 
 
 @app.post("/connect/google", response_model=None)
-async def google_connect_submit(request: Request) -> Response:
-    body = await request.body()
-    values = parse_qs(body[:4096].decode("utf-8", errors="replace"), keep_blank_values=True)
-    access_key = str((values.get("access_key") or [""])[0])
-    if settings.admin_key and not compare_digest(access_key, settings.admin_key):
-        return HTMLResponse(google_connect_page(invalid_key=True), status_code=401)
+def google_connect_submit() -> Response:
     return begin_google_authorization()
 
 

@@ -327,6 +327,8 @@ class WatcherAppAuthTests(unittest.TestCase):
         resp = self.client.get("/connect/google")
         self.assertEqual(200, resp.status_code)
         self.assertIn("Connect Gmail", resp.text)
+        self.assertIn("verified app", resp.text)
+        self.assertNotIn("access-key", resp.text)
 
         with patch.object(self.watcher_app, "begin_google_authorization") as begin_auth:
             from fastapi.responses import RedirectResponse
