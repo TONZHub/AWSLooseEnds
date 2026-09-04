@@ -324,6 +324,28 @@ class WatcherAppAuthTests(unittest.TestCase):
         self.assertEqual(200, resp.status_code)
         self.assertIn('<a href="/admin" class="cut admin-link"', resp.text)
         self.assertIn("actions-2x2", resp.text)
+        self.assertIn("The Watcher is Alive", resp.text)
+        self.assertIn("scope-screen", resp.text)
+        self.assertIn("ekg-trace", resp.text)
+        self.assertIn("pulse-beacon", resp.text)
+
+    def test_status_page_redirects_browser_to_homepage_graphic(self):
+        # Browsers asking for text/html get redirected to the homepage live monitor
+        resp = self.client.get(
+            "/status",
+            headers={"Accept": "text/html,application/xhtml+xml"},
+            follow_redirects=False,
+        )
+        self.assertEqual(303, resp.status_code)
+        self.assertEqual("/#watcher-monitor", resp.headers.get("location"))
+
+        # Programmatic/API clients still get JSON
+        json_resp = self.client.get(
+            "/status",
+            headers={"Accept": "application/json"},
+        )
+        self.assertEqual(200, json_resp.status_code)
+        self.assertEqual("alive", json_resp.json().get("status"))
 
     def test_connect_google_endpoints(self):
         resp = self.client.get("/connect/google")

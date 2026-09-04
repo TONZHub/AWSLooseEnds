@@ -233,6 +233,24 @@ RECEIPTS_CSS = """
   .action:hover,.action:focus-visible { transform:translate(-2px,-3px) rotate(-.4deg); box-shadow:8px 10px 0 var(--red); outline:none; }
   .action strong { display:block; margin-bottom:10px; text-transform:uppercase; letter-spacing:.08em; }
   .action small { color:#544e43; line-height:1.45; }
+  .live-eyebrow { display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; text-transform:uppercase; letter-spacing:.2em; font-size:.72rem; font-weight:700; }
+  .pulse-beacon { display:inline-block; width:9px; height:9px; border-radius:50%; background:#39ff14; box-shadow:0 0 10px #39ff14; animation:pulse-beacon 1.4s ease-in-out infinite; }
+  @keyframes pulse-beacon { 0%, 100% { transform:scale(1); opacity:1; box-shadow:0 0 8px #39ff14; } 50% { transform:scale(1.35); opacity:.55; box-shadow:0 0 16px #39ff14; } }
+  .live-pill { font-family:"Courier New",monospace; font-size:.68rem; font-weight:700; color:#111; background:var(--yellow); padding:1px 7px; border:1px solid #111; letter-spacing:.06em; margin-left:4px; transform:rotate(-1deg); }
+  .action-telemetry { display:flex; flex-direction:column; justify-content:space-between; min-height:112px; padding:18px 20px; text-decoration:none; border:2px solid #111; background:#f5efdd; box-shadow:5px 6px 0 #111; }
+  .action-telemetry:hover { transform:translate(-2px,-3px) rotate(-.4deg); box-shadow:8px 10px 0 var(--red); }
+  .telemetry-top { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; }
+  .telemetry-top strong { display:block; text-transform:uppercase; letter-spacing:.08em; font-size:.95rem; }
+  .monitor-live-tag { display:inline-flex; align-items:center; gap:6px; font-family:"Courier New",monospace; font-size:.7rem; font-weight:700; color:#1b5e20; background:#e8f5e9; border:1.5px solid #2e7d32; padding:2px 7px; box-shadow:1px 2px 0 #111; }
+  .pulse-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#39ff14; box-shadow:0 0 8px #39ff14; animation:pulse-beacon 1.4s ease-in-out infinite; }
+  .scope-screen { background:#0a110a; border:1.5px solid #1b2e1b; box-shadow:inset 0 0 8px rgba(57,255,20,.2); border-radius:2px; overflow:hidden; margin:4px 0 8px; height:50px; position:relative; }
+  .scope-svg { width:100%; height:100%; display:block; }
+  .ekg-trace { fill:none; stroke:url(#trace-glow); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; filter:drop-shadow(0 0 3px #39ff14); stroke-dasharray:600; stroke-dashoffset:600; animation:ekg-dash 2.4s linear infinite; }
+  @keyframes ekg-dash { 0% { stroke-dashoffset:600; } 100% { stroke-dashoffset:0; } }
+  .scope-scanline { stroke:rgba(166,255,84,.45); stroke-width:2; animation:scanline-sweep 2.4s linear infinite; }
+  @keyframes scanline-sweep { 0% { transform:translateX(0); } 100% { transform:translateX(320px); } }
+  .telemetry-metrics { font-family:"Courier New",monospace; font-size:.76rem; color:#544e43; line-height:1.45; display:block; }
+  .telemetry-metrics strong { font-weight:700; color:#111; text-transform:none; letter-spacing:normal; }
   .source-auth { margin:32px 0; padding:24px; border:2px solid #111; background:#f5efdd;
     box-shadow:7px 8px 0 var(--red); }
   .source-auth label { display:block; margin-bottom:9px; text-transform:uppercase; letter-spacing:.12em; font-weight:700; }
@@ -272,12 +290,19 @@ def receipts_wordmark() -> str:
 
 
 def receipts_page(*, title: str, body: str) -> str:
+    cadence_mins = settings.poll_interval_seconds // 60
+    cadence_str = f"{cadence_mins}M" if cadence_mins > 0 else f"{settings.poll_interval_seconds}S"
+    eyebrow_html = f"""<div class="eyebrow live-eyebrow">
+      <span class="pulse-beacon" aria-hidden="true"></span>
+      <span>the watcher is alive</span>
+      <span class="live-pill" title="Watcher active pulse">LIVE · {cadence_str} PULSE</span>
+    </div>"""
     return f"""<!doctype html><html lang="en"><head>
       <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
       <title>{title} · Receipts</title><link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
       <style>{RECEIPTS_CSS}</style></head>
       <body><main class="stage"><i class="tape" aria-hidden="true"></i><i class="tape right" aria-hidden="true"></i>
-      <article class="paper"><div class="eyebrow">the watcher is alive</div>{receipts_wordmark()}{body}
+      <article class="paper">{eyebrow_html}{receipts_wordmark()}{body}
       <footer><span>DO NOT DISCARD · REF RCPT-001</span><a href="/privacy">Privacy</a><em>we have the receipts.</em></footer>
       </article></main></body></html>"""
 
@@ -312,9 +337,14 @@ def favicon() -> FileResponse:
 
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
+    connections = store.public_status()
+    source_count = len(connections)
+    sources_label = f"{source_count} source" if source_count == 1 else f"{source_count} sources"
+    cadence_mins = settings.poll_interval_seconds // 60
+    cadence_str = f"{cadence_mins}m" if cadence_mins > 0 else f"{settings.poll_interval_seconds}s"
     return receipts_page(
         title="Evidence ledger",
-        body="""
+        body=f"""
           <p class="lede">Every promise captured becomes <span class="highlight">EVIDENCE.</span>
           Every deadline—recorded. The ledger does not sleep.</p>
           <section class="evidence"><div class="stamp">intercepted · awaiting statement</div>
@@ -323,7 +353,34 @@ def home() -> str:
             <a class="action" href="/connect/google"><strong>Connect Gmail</strong><small>Watch authorized sent mail for commitments and evidence of follow-through.</small></a>
             <a class="action" href="/alexa/pair"><strong>Pair Alexa</strong><small>Generate a short-lived code. No Login with Amazon required.</small></a>
             <a class="action" href="/mobile/pair"><strong>Pair Android</strong><small>Issue a one-time code that connects the phone to this evidence ledger.</small></a>
-            <a class="action" href="/status"><strong>Watcher status</strong><small>Inspect connected sources and the last completed scan.</small></a>
+            <div class="action action-telemetry" id="watcher-monitor" aria-label="The watcher is alive monitor">
+              <div class="telemetry-top">
+                <strong>The Watcher is Alive</strong>
+                <span class="monitor-live-tag"><span class="pulse-dot" aria-hidden="true"></span>ACTIVE</span>
+              </div>
+              <div class="scope-screen" title="Watcher heartbeat oscilloscope">
+                <svg class="scope-svg" viewBox="0 0 320 54" preserveAspectRatio="none">
+                  <defs>
+                    <pattern id="scope-grid" width="16" height="18" patternUnits="userSpaceOnUse">
+                      <path d="M 16 0 L 0 0 0 18" fill="none" stroke="#16291a" stroke-width="0.75"/>
+                    </pattern>
+                    <linearGradient id="trace-glow" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stop-color="#39ff14" stop-opacity="0.15"/>
+                      <stop offset="65%" stop-color="#39ff14" stop-opacity="0.85"/>
+                      <stop offset="100%" stop-color="#a6ff54" stop-opacity="1"/>
+                    </linearGradient>
+                  </defs>
+                  <rect width="320" height="54" fill="url(#scope-grid)"/>
+                  <path class="ekg-trace" d="M 0,27 L 65,27 L 72,12 L 80,42 L 88,8 L 96,36 L 104,27 L 200,27 L 208,12 L 216,42 L 224,8 L 232,36 L 240,27 L 320,27"/>
+                  <line class="scope-scanline" x1="0" y1="0" x2="0" y2="54"/>
+                </svg>
+              </div>
+              <small class="telemetry-metrics">
+                <span>Cadence: <strong>{cadence_str}</strong></span> ·
+                <span>Sources: <strong>{sources_label}</strong></span> ·
+                <span>State: <strong>Synchronized</strong></span>
+              </small>
+            </div>
           </nav>
         """,
     )
@@ -577,10 +634,15 @@ async def scan_now() -> dict:
 
 
 @app.get("/status")
-def watcher_status() -> dict:
+def watcher_status(request: Request) -> Any:
+    accept = request.headers.get("accept", "")
+    format_param = request.query_params.get("format")
+    if "text/html" in accept and format_param != "json":
+        return RedirectResponse("/#watcher-monitor", status_code=status.HTTP_303_SEE_OTHER)
     return {
         "poll_interval_seconds": settings.poll_interval_seconds,
         "connections": store.public_status(),
+        "status": "alive",
     }
 
 
@@ -610,7 +672,7 @@ def admin_desk() -> str:
                 <small>Run an immediate scan and evidence reconciliation cycle across all accounts.</small>
               </button>
             </form>
-            <a class="action" href="/status"><strong>Raw Status JSON</strong><small>Inspect JSON endpoint response.</small></a>
+            <a class="action" href="/status?format=json"><strong>Raw Status JSON</strong><small>Inspect JSON endpoint response.</small></a>
             <a class="action" href="/"><strong>Public Evidence Desk</strong><small>Return to public user landing page.</small></a>
           </nav>
         """,
