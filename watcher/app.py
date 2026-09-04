@@ -268,7 +268,7 @@ RECEIPTS_CSS = """
   .code strong { display:block; color:var(--yellow); font:700 clamp(2.5rem,10vw,5.5rem)/1 "Courier New",monospace; letter-spacing:.24em; }
   .meta { color:var(--muted); font-size:.78rem; line-height:1.6; overflow-wrap:anywhere; }
   footer { display:flex; justify-content:space-between; gap:20px; margin-top:42px; padding-top:18px; border-top:1px solid #918875; color:var(--muted); font-size:.72rem; }
-  footer a { text-decoration-thickness:2px; }
+  footer a { color:inherit; text-decoration-thickness:2px; }
   @media (max-width:600px) {
     .paper { padding:40px 22px 32px; }
     .wordmark { margin-top:24px; }
@@ -303,7 +303,7 @@ def receipts_page(*, title: str, body: str) -> str:
       <style>{RECEIPTS_CSS}</style></head>
       <body><main class="stage"><i class="tape" aria-hidden="true"></i><i class="tape right" aria-hidden="true"></i>
       <article class="paper">{eyebrow_html}{receipts_wordmark()}{body}
-      <footer><span>DO NOT DISCARD · REF RCPT-001</span><a href="/privacy">Privacy</a><em>we have the receipts.</em></footer>
+      <footer><span>DO NOT DISCARD · REF RCPT-001</span><span><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span><em>we have the receipts.</em></footer>
       </article></main></body></html>"""
 
 
@@ -622,8 +622,33 @@ def privacy() -> str:
           <p>Receipts processes commitments you intentionally capture and authorized sent Gmail messages.
           Alexa contributes an opaque device identity. Pairing codes are short-lived and single-use.
           Refresh tokens are encrypted, and the watcher does not persist full emails.</p></section>
-          <p class="meta">Receipts does not use Login with Amazon, sell personal information, or use it for advertising.</p>
-          <nav class="actions"><a class="action" href="/"><strong>Return to Receipts</strong><small>Back to the evidence desk.</small></a></nav>
+          <p class="meta">Receipts does not use Login with Amazon, sell personal information, or use it for advertising. Review our <a href="/terms">Terms of Use</a>.</p>
+          <nav class="actions">
+            <a class="action" href="/terms"><strong>Terms of Use</strong><small>Rules of engagement and service guidelines.</small></a>
+            <a class="action" href="/"><strong>Return to Receipts</strong><small>Back to the evidence desk.</small></a>
+          </nav>
+        """,
+    )
+
+
+@app.get("/terms", response_class=HTMLResponse)
+def terms() -> str:
+    return receipts_page(
+        title="Terms of Use",
+        body="""
+          <p class="lede"><span class="highlight">TERMS OF USE.</span> Clear commitments, no fine-print traps.</p>
+          <section class="evidence"><div class="stamp">rules of engagement</div>
+          <p>Receipts is an evidence ledger designed to help you capture, verify, and follow through on commitments.
+          By using Receipts across the web, Alexa, or Android, you agree to track only lawful promises and maintain custody
+          of your authorized connections.</p></section>
+          <section class="evidence" style="margin-top:16px"><div class="stamp">service warranty</div>
+          <p>Receipts provides tracking and proactive alerts on an “as-is” basis. While the watcher works
+          diligently so your deadlines never slip by unnoticed, you remain solely responsible for fulfilling your own commitments.</p></section>
+          <p class="meta">You may revoke device pairings or disconnect Google OAuth access at any time. Review our <a href="/privacy">Privacy Notice</a>.</p>
+          <nav class="actions">
+            <a class="action" href="/privacy"><strong>Privacy Notice</strong><small>How Receipts handles data, tokens, and evidence security.</small></a>
+            <a class="action" href="/"><strong>Return to Receipts</strong><small>Back to the evidence desk.</small></a>
+          </nav>
         """,
     )
 

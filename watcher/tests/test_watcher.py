@@ -366,6 +366,25 @@ class WatcherAppAuthTests(unittest.TestCase):
             start_resp = self.client.get("/auth/google/start", follow_redirects=False)
             self.assertIn(start_resp.status_code, (302, 303, 307))
 
+    def test_privacy_and_terms_endpoints(self):
+        # Test footer has both Privacy and Terms
+        home_resp = self.client.get("/")
+        self.assertEqual(200, home_resp.status_code)
+        self.assertIn('<a href="/privacy">Privacy</a>', home_resp.text)
+        self.assertIn('<a href="/terms">Terms</a>', home_resp.text)
+
+        # Test /privacy page links to Terms
+        privacy_resp = self.client.get("/privacy")
+        self.assertEqual(200, privacy_resp.status_code)
+        self.assertIn("Privacy notice", privacy_resp.text)
+        self.assertIn('href="/terms"', privacy_resp.text)
+
+        # Test /terms page links to Privacy
+        terms_resp = self.client.get("/terms")
+        self.assertEqual(200, terms_resp.status_code)
+        self.assertIn("TERMS OF USE", terms_resp.text)
+        self.assertIn('href="/privacy"', terms_resp.text)
+
 
 if __name__ == "__main__":
     unittest.main()
